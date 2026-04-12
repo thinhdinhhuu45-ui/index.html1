@@ -3,295 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KHAI PHÓNG v∞ - INFINITY EDITION</title>
+    <title>KP v-PRO | THE FINAL GATE</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Quicksand', sans-serif; background: #fafafa; color: #0d0d0d; }
-        .tab-active { background: #6366f1 !important; color: white !important; transform: scale(1.05); }
-        .card { perspective: 1500px; height: 420px; cursor: pointer; }
-        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.7s cubic-bezier(0.19, 1, 0.22, 1); transform-style: preserve-3d; }
-        .is-flipped { transform: rotateY(180deg); }
-        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 40px; border: 1px solid rgba(0,0,0,0.03); background: white; padding: 40px; box-shadow: 0 15px 35px -10px rgba(0,0,0,0.08); transition: box-shadow 0.3s; }
-        .face-back { transform: rotateY(180deg); background: linear-gradient(135deg, #818cf8, #6366f1); color: white; }
-        .face:hover { box-shadow: 0 20px 50px -15px rgba(79, 70, 229, 0.15); }
-        input, textarea { transition: all 0.2s; border: 1px solid #eaeaea !important; }
-        input:focus, textarea:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08) !important; }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background-color: #eaeaea; border-radius: 3px; }
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+        .tab-active { background: #1e293b !important; color: white !important; border-color: #1e293b !important; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 16px; width: 100%; }
+        .heat-map { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; }
+        .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; transition: background 0.3s; }
+        * { transition: none !important; } /* Zero Latency: Triệt tiêu độ trễ */
+        .hidden { display: none !important; }
+        .custom-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="flex flex-col items-center p-4">
+<body class="flex justify-center p-2 sm:p-4">
 
-    <div class="w-full max-w-md flex flex-col h-[95dvh]">
-        <div class="flex justify-between items-center mb-8 px-2">
-            <div class="flex flex-col">
-                <h1 class="text-3xl font-black italic text-indigo-700 leading-none tracking-tighter">KP v∞</h1>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2 italic">Infinity Potential AI</span>
+    <div class="w-full max-w-lg flex flex-col h-[98dvh]">
+        <header class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
+            <div class="flex items-center gap-4">
+                <span class="font-black text-orange-500 text-lg">🔥 <span id="streak">0</span></span>
+                <span id="mastery" class="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-md border border-indigo-100 uppercase tracking-tighter">MSTRY: 0%</span>
             </div>
-            <p id="count" class="text-xs font-black bg-white px-4 py-2 rounded-full shadow-inner text-slate-500 border border-slate-100"></p>
-        </div>
+            <div id="heatmap" class="heat-map w-32"></div>
+            <div class="text-[10px] font-mono text-slate-400 font-bold" id="stats-total">0 UNITS</div>
+        </header>
 
-        <main id="app" class="flex-grow overflow-hidden relative bg-white rounded-[48px] shadow-3xl shadow-indigo-100 border border-white p-7"></main>
+        <main id="view" class="flex-grow overflow-hidden relative"></main>
 
-        <nav class="mt-8 flex gap-3 bg-white/70 backdrop-blur-lg p-3 rounded-[32px] shadow-xl border border-white">
-            <button onclick="router('study')" id="m-study" class="flex-1 py-4 rounded-2xl font-bold transition-all duration-300 hover:bg-indigo-50 text-slate-600">HỌC</button>
-            <button onclick="router('add')" id="m-add" class="flex-1 py-4 rounded-2xl font-bold transition-all duration-300 hover:bg-indigo-50 text-slate-600 text-sm">THÊM TỪ</button>
-            <button onclick="router('list')" id="m-list" class="flex-1 py-4 rounded-2xl font-bold transition-all duration-300 hover:bg-indigo-50 text-slate-600">KHO</button>
+        <nav class="mt-2 grid grid-cols-4 gap-1.5">
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [S]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [N]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [V]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data</button>
         </nav>
     </div>
 
     <script>
-        const db = {
-            // Chuyển dữ liệu từ bản V23 cũ sang hệ thống quản lý Vô Hạn mới
-            data: JSON.parse(localStorage.getItem('KP_V23_DATA')) || [],
-            // Lưu dữ liệu vào két sắt Vô Hạn
+        // --- CƠ SỞ DỮ LIỆU & LOGIC ---
+        const DB = {
+            vocab: JSON.parse(localStorage.getItem('KP_PRO_VOCAB')) || [],
+            meta: JSON.parse(localStorage.getItem('KP_PRO_META')) || { streak: 0, lastDate: null, history: {} },
             save() {
-                localStorage.setItem('KP_INFINITY_DATA', JSON.stringify(this.data));
-                localStorage.setItem('KP_V23_DATA', JSON.stringify(this.data)); // Giữ bản V23 để dự phòng
-                document.getElementById('count').innerText = this.data.length + " UNITS";
+                localStorage.setItem('KP_PRO_VOCAB', JSON.stringify(this.vocab));
+                localStorage.setItem('KP_PRO_META', JSON.stringify(this.meta));
+                this.updateUI();
+            },
+            updateUI() {
+                document.getElementById('streak').innerText = this.meta.streak;
+                document.getElementById('stats-total').innerText = this.vocab.length + " UNITS";
+                const mastered = this.vocab.filter(i => i.ef > 3.2).length;
+                document.getElementById('mastery').innerText = `MSTRY: ${this.vocab.length ? Math.round(mastered/this.vocab.length*100) : 0}%`;
+                this.renderHeatmap();
+            },
+            renderHeatmap() {
+                const h = document.getElementById('heatmap'); h.innerHTML = '';
+                const today = new Date();
+                for(let i=20; i>=0; i--) {
+                    const d = new Date(); d.setDate(today.getDate() - i);
+                    const count = this.meta.history[d.toDateString()] || 0;
+                    const cell = document.createElement('div');
+                    cell.className = 'heat-cell';
+                    if(count > 0) cell.style.background = `rgba(79, 70, 229, ${Math.min(0.2 + count * 0.15, 1)})`;
+                    h.appendChild(cell);
+                }
             }
         };
 
-        // THUẬT TOÁN TRÍ NHỚ SIÊU VIỆT V-INFINITY (Logic lõi)
-        class SpacedRepetition {
-            constructor() { this.intervals = [1, 2, 5, 10, 25, 60, 150]; } // Các mốc thời gian Review vàng (ngày)
-            getNextReview(item, isCorrect) {
-                let intervalIdx = item.intervalIdx || 0;
-                if (isCorrect) {
-                    intervalIdx = Math.min(intervalIdx + 1, this.intervals.length - 1);
-                } else {
-                    intervalIdx = 0; // Quên là học lại từ đầu
-                }
-                const nextReview = new Date();
-                nextReview.setDate(nextReview.getDate() + this.intervals[intervalIdx]);
-                return { intervalIdx, nextReviewTime: nextReview.getTime() };
-            }
-        }
-        const aiMemory = new SpacedRepetition();
-
-        let state = { view: '', idx: 0, flipped: false, queue: [] };
-
-        // 1. AI DỊCH THUẬT TINH TẾ (Nâng cấp)
-        async function translate(word) {
-            if(!word) return "";
-            try {
-                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=at&q=meaning of ${encodeURIComponent(word)}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                let result = data[0][0][0].toLowerCase();
-                result = result.replace(/nghĩa là /g, "").replace(/ý nghĩa của /g, "").replace(/của /g, "");
+        const Core = {
+            state: { view: '', flipped: false, queue: [] },
+            
+            route(v) {
+                this.state.view = v; this.state.flipped = false;
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+                const btn = document.getElementById('n-'+v); if(btn) btn.classList.add('tab-active');
+                const port = document.getElementById('view'); port.innerHTML = '';
                 
-                // Bộ lọc vá "ngáo" Google xịn nhất hiện nay
-                const intelligentDictionary = {
-                    "break a leg": "chúc may mắn",
-                    "hand down": "truyền lại / tuyên án",
-                    "hands down": "dễ dàng / chắc chắn",
-                    "piece of cake": "dễ như ăn bánh",
-                    "cut someone some slack": "tha thứ cho ai đó",
-                    "get over something": "vượt qua (nỗi đau)",
-                    "hang in there": "cố gắng lên"
-                };
-                return intelligentDictionary[word.toLowerCase().trim()] || result;
-            } catch { return ""; }
-        }
+                if (v === 'study') this.renderStudy(port);
+                if (v === 'nexus') this.renderNexus(port);
+                if (v === 'vault') this.renderVault(port);
+                if (v === 'data') this.renderData(port);
+                DB.save();
+            },
 
-        async function getPhonetic(word) {
-            try {
-                const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-                const data = await res.json();
-                return data[0]?.phonetic || data[0]?.phonetics?.find(p => p.text)?.text || "";
-            } catch { return ""; }
-        }
-
-        function speak(text) {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel(); 
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.82; // Tốc độ Vô Hạn: tối ưu để nghe từng nhấn âm
-            window.speechSynthesis.speak(utterance);
-        }
-
-        function router(view) {
-            state.view = view;
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
-            const activeBtn = document.getElementById('m-' + view);
-            if(activeBtn) activeBtn.classList.add('tab-active');
-            const container = document.getElementById('app');
-            container.innerHTML = '';
-            if (view === 'add') renderAdd(container);
-            if (view === 'list') renderList(container);
-            if (view === 'study') renderStudy(container);
-            db.save();
-        }
-
-        function renderAdd(v) {
-            v.innerHTML = `
-                <div class="h-full flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div class="bg-indigo-50/70 p-6 rounded-[36px] border border-indigo-100/70 relative">
-                        <p class="text-[9px] font-black text-indigo-400 mb-4 uppercase tracking-[0.25em]">Nhập lẻ AI Vô Hạn</p>
-                        <input id="in-en" placeholder="Gõ tiếng Anh..." class="w-full p-4 rounded-2xl bg-white border-none outline-none font-bold text-lg mb-4 shadow-sm placeholder:text-slate-300">
-                        <div id="in-ph" class="hidden"></div> 
-                        <input id="in-vi" placeholder="Nghĩa tinh tế..." class="w-full p-4 rounded-2xl bg-white/90 border-none outline-none text-indigo-600 font-semibold shadow-sm placeholder:text-indigo-200">
-                        <button onclick="addSingle()" class="w-full mt-4 py-4.5 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-100 active:scale-95 transition-all uppercase tracking-[0.2em]">LƯU BẢO BỐI</button>
-                    </div>
-                    
-                    <div class="flex-grow flex flex-col">
-                        <p class="text-[9px] font-black text-slate-400 mb-4 uppercase tracking-[0.25em]">Nhập lô (từ : nghĩa)</p>
-                        <textarea id="bulk-input" class="flex-grow w-full p-6 bg-slate-50/50 border-none rounded-[36px] outline-none text-sm font-medium text-slate-600 shadow-inner placeholder:text-slate-300" placeholder="apple : quả táo&#10;break a leg : chúc may mắn"></textarea>
-                        <button onclick="handleImport()" class="w-full mt-4 py-4 bg-slate-800 text-white rounded-2xl font-black text-sm uppercase active:scale-95 transition-all tracking-[0.2em] shadow-2xl">Import Tất cả</button>
-                    </div>
-                </div>
-            `;
-            
-            const enInput = document.getElementById('in-en');
-            let timer;
-            enInput.oninput = () => {
-                clearTimeout(timer);
-                timer = setTimeout(async () => {
-                    const val = enInput.value.trim();
-                    if(val) {
-                        document.getElementById('in-vi').value = await translate(val);
-                        document.getElementById('in-ph').innerText = await getPhonetic(val);
-                    }
-                }, 500);
-            };
-        }
-
-        function addSingle() {
-            const en = document.getElementById('in-en').value.trim();
-            const vi = document.getElementById('in-vi').value.trim();
-            const ph = document.getElementById('in-ph').innerText;
-            if(en && vi) {
-                // Khởi tạo các tham số trí nhớ cho từ mới
-                db.data.push({ id: Date.now(), en, vi, ph, intervalIdx: 0, nextReviewTime: Date.now() });
-                db.save();
-                router('add');
-            }
-        }
-
-        function handleImport() {
-            const input = document.getElementById('bulk-input').value;
-            input.split('\n').forEach(line => {
-                const parts = line.split(':');
-                if (parts.length >= 2) {
-                    const en = parts[0].trim(), vi = parts[1].trim();
-                    if (en && vi) {
-                        // Khởi tạo tham số trí nhớ mặc định cho từ nhập lô
-                        db.data.push({ id: Date.now() + Math.random(), en, vi, ph: "", intervalIdx: 0, nextReviewTime: Date.now() });
-                    }
+            // --- HỌC TẬP (STUDY MODE) ---
+            renderStudy(v) {
+                this.state.queue = DB.vocab.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
+                if(this.state.queue.length === 0) {
+                    v.innerHTML = `<div class="card-side text-slate-400 font-bold border-dashed text-sm uppercase tracking-widest px-10 text-center">Tất cả từ hôm nay đã xong! Quay lại sau nhé.</div>`;
+                    return;
                 }
-            });
-            db.save();
-            router('list');
-        }
-
-        // 3. AI HỌC TẬP THÔNG MINH (Nâng cấp)
-        function renderStudy(v) {
-            if (db.data.length === 0) return v.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-slate-300 font-black italic animate-pulse">KHO AI VÔ HẠN ĐANG TRỐNG...</div>`;
-            
-            const currentTime = Date.now();
-            // Chỉ hiện các từ đến hạn review. Nếu không có, đảo thứ tự ngẫu nhiên.
-            state.queue = db.data.filter(item => !item.nextReviewTime || item.nextReviewTime <= currentTime);
-            if(state.queue.length === 0) {
-                 state.queue = [...db.data].sort(() => Math.random() - 0.5);
-            }
-            if (state.idx >= state.queue.length) state.idx = 0;
-            
-            const item = state.queue[state.idx];
-            state.flipped = false;
-            
-            speak(item.en);
-
-            v.innerHTML = `
-                <div class="h-full flex flex-col animate-in zoom-in-95 duration-400">
-                    <div class="card" onclick="flip()">
-                        <div id="card-inner" class="card-inner">
-                            <div class="face shadow-sm">
-                                <div class="text-xs uppercase tracking-[0.4em] opacity-40 mb-6 font-bold text-indigo-400">English</div>
-                                <div class="text-5xl font-extrabold leading-tight">${item.en}</div>
-                                <div class="text-lg text-indigo-400 font-semibold mt-3 tracking-widest">${item.ph || ''}</div>
-                                
-                                <button onclick="event.stopPropagation(); speak('${item.en.replace(/'/g, "\\'")}')" class="mt-10 p-5 bg-indigo-50/70 rounded-full text-indigo-500 hover:bg-indigo-100 hover:scale-110 transition-all shadow-inner border border-indigo-100/70">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-                                </button>
+                const item = this.state.queue[0];
+                v.innerHTML = `
+                    <div id="study-card" class="h-full flex flex-col">
+                        <div class="relative cursor-pointer" onclick="Core.flip()">
+                            <div id="card-front" class="card-side shadow-sm p-6 text-center">
+                                <h2 class="text-4xl font-black mb-2 tracking-tighter uppercase">${item.en}</h2>
+                                <p class="text-slate-400 font-mono text-sm">${item.ipa||''}</p>
                             </div>
-                            <div class="face face-back shadow-indigo-200 shadow-3xl">
-                                <span class="text-xs uppercase tracking-[0.3em] opacity-60 mb-5 font-bold">Nghĩa là</span>
-                                <div class="text-4xl font-extrabold">${item.vi}</div>
-                                <div class="mt-auto flex gap-4 w-full">
-                                    <button onclick="event.stopPropagation(); processReview(false)" class="flex-1 py-4 bg-rose-50/80 text-rose-600 rounded-2xl font-black text-sm active:scale-95 transition-all">QUÊN MẤT</button>
-                                    <button onclick="event.stopPropagation(); processReview(true)" class="flex-1 py-4 bg-white text-indigo-700 rounded-2xl font-black text-sm active:scale-95 transition-all shadow-xl">ĐÃ THUỘC</button>
-                                </div>
+                            <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/30">
+                                <h2 class="text-3xl font-bold text-indigo-600 mb-4 tracking-tight">${item.vi}</h2>
+                                <p class="text-xs text-slate-500 italic px-6 leading-relaxed">${item.ex || 'Không có ví dụ.'}</p>
                             </div>
                         </div>
+                        <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none">
+                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-200 py-4 font-black text-[10px] rounded-xl hover:bg-slate-50">1: AGAIN</button>
+                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-200 py-4 font-black text-[10px] rounded-xl hover:bg-slate-50">2: HARD</button>
+                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-200 py-4 font-black text-[10px] rounded-xl hover:bg-slate-50">3: GOOD</button>
+                            <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg shadow-indigo-200">4: EASY</button>
+                        </div>
+                        <p class="text-[9px] text-center mt-3 text-slate-400 font-bold uppercase tracking-[0.2em]">Space/F: Lật | 1-4: Đánh giá</p>
+                    </div>`;
+            },
+
+            flip() {
+                if (this.state.view !== 'study' || this.state.queue.length === 0) return;
+                const front = document.getElementById('card-front');
+                const back = document.getElementById('card-back');
+                const ctrl = document.getElementById('study-controls');
+                this.state.flipped = !this.state.flipped;
+                
+                if(front && back && ctrl) {
+                    front.classList.toggle('hidden', this.state.flipped);
+                    back.classList.toggle('hidden', !this.state.flipped);
+                    ctrl.classList.toggle('opacity-20', !this.state.flipped);
+                    ctrl.classList.toggle('pointer-events-none', !this.state.flipped);
+                }
+            },
+
+            ans(q) {
+                if(!this.state.flipped) return; // Bảo mật thuật toán: Chỉ đánh giá khi đã lật
+                const item = this.state.queue[0];
+                let { reps, ef, interval: i } = item;
+                
+                if (q >= 3) {
+                    if (reps === 0) i = 1; else if (reps === 1) i = 4; else i = Math.round(i * ef);
+                    reps++;
+                } else { reps = 0; i = 1; }
+                
+                ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+                
+                // Thuật toán: Nếu Again (q=0) hiện lại sau 10 phút, còn lại theo ngày + fuzzing
+                const delay = (q === 0) ? 600000 : (i * (0.95 + Math.random() * 0.1)) * 86400000;
+                
+                Object.assign(item, { reps, ef, interval: i, next: Date.now() + delay });
+                
+                const today = new Date().toDateString();
+                DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
+                this.updateStreak(); this.route('study');
+            },
+
+            // --- NHẬP LIỆU (NEXUS MODE) ---
+            renderNexus(v) {
+                v.innerHTML = `
+                    <div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4">
+                        <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nhập từ mới</div>
+                        <input id="in-en" autocomplete="off" placeholder="Tiếng Anh..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-xl">
+                        <input id="in-vi" autocomplete="off" placeholder="Nghĩa..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg">
+                        <div id="nexus-info" class="text-[10px] text-slate-400 font-bold uppercase tracking-widest min-h-[15px] ml-1"></div>
+                        <button onclick="Core.add()" class="bg-indigo-600 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg active:scale-95">Thêm vào Vault [Enter]</button>
                     </div>
-                </div>
-            `;
-        }
+                    <textarea id="bulk" class="w-full h-32 mt-2 p-4 outline-none text-xs font-mono bg-white border border-slate-100 rounded-2xl custom-scroll" placeholder="Nhập nhanh (từ : nghĩa)"></textarea>`;
+                
+                setTimeout(() => document.getElementById('in-en').focus(), 10);
+                
+                const en = document.getElementById('in-en');
+                en.oninput = async () => {
+                    const val = en.value.trim();
+                    if(val.length > 1) {
+                        const [t, i] = await Promise.all([
+                            fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
+                            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
+                        ]);
+                        document.getElementById('in-vi').value = t?.[0]?.[0]?.[0]?.toLowerCase() || '';
+                        const entry = i?.[0];
+                        window.curInf = { ipa: entry?.phonetic || '', ex: entry?.meanings?.[0]?.definitions?.find(d => d.example)?.example || '' };
+                        document.getElementById('nexus-info').innerText = window.curInf.ipa || 'IPA: ...';
+                    }
+                };
+            },
 
-        // Logic xử lý trí nhớ dựa trên câu trả lời của cậu
-        function processReview(isCorrect) {
-            const currentTime = Date.now();
-            // Lấy đúng Item đang học trong Queue
-            const queueItem = state.queue[state.idx];
-            // Tìm Item đó trong dữ liệu gốc (Két sắt)
-            const dbItem = db.data.find(i => i.id === queueItem.id);
-            if(dbItem) {
-                const { intervalIdx, nextReviewTime } = aiMemory.getNextReview(dbItem, isCorrect);
-                dbItem.intervalIdx = intervalIdx;
-                dbItem.nextReviewTime = nextReviewTime;
-                db.save();
-                state.idx++;
-                renderStudy(document.getElementById('app'));
-            }
-        }
+            add() {
+                const en = document.getElementById('in-en')?.value.trim();
+                const vi = document.getElementById('in-vi')?.value.trim();
+                if(!en || !vi) return;
+                DB.vocab.push({ id: Date.now(), en, vi, ipa: window.curInf?.ipa || '', ex: window.curInf?.ex || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
+                window.curInf = null; 
+                document.getElementById('in-en').value = ''; 
+                document.getElementById('in-vi').value = '';
+                document.getElementById('in-en').focus(); 
+                DB.save();
+            },
 
-        function flip() {
-            state.flipped = !state.flipped;
-            const el = document.getElementById('card-inner');
-            if(el) el.classList.toggle('is-flipped', state.flipped);
-        }
+            // --- KHO LƯU TRỮ (VAULT MODE) ---
+            renderVault(v) {
+                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="Tìm kiếm trong kho..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                this.search('');
+            },
 
-        function renderList(v) {
-            const items = db.data.slice().reverse().map(item => `
-                <div class="flex justify-between items-center p-6 border-b border-slate-50 hover:bg-slate-50 transition-colors rounded-3xl mb-1.5">
-                    <div class="text-sm">
-                        <b class="text-indigo-600 font-bold">${item.en}</b> 
-                        ${item.ph ? `<span class="text-[10px] text-indigo-300 ml-1.5 font-semibold">${item.ph}</span>` : ''}
-                        <span class="text-slate-300 mx-2.5">•</span> 
-                        <span class="text-slate-500">${item.vi}</span>
+            search(q) {
+                const list = document.getElementById('v-list');
+                const query = q.toLowerCase();
+                list.innerHTML = DB.vocab.filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query)).slice().reverse().map(i => `
+                    <div class="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl">
+                        <div class="text-sm font-black text-slate-700">${i.en} <span class="text-indigo-400 ml-1 font-bold">/ ${i.vi}</span></div>
+                        <button onclick="Core.del(${i.id})" class="text-rose-400 text-[10px] font-black uppercase tracking-tighter hover:text-rose-600">Xóa</button>
+                    </div>`).join('');
+            },
+
+            del(id) {
+                const backup = [...DB.vocab];
+                const item = DB.vocab.find(i => i.id === id);
+                DB.vocab = DB.vocab.filter(i => i.id !== id);
+                DB.save(); this.search(document.getElementById('v-search')?.value || '');
+                
+                const toast = document.createElement('div');
+                toast.className = "fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl text-[10px] font-black shadow-2xl flex gap-4 items-center z-50";
+                toast.innerHTML = `ĐÃ XÓA: ${item.en.toUpperCase()} <button id="undo-btn" class="text-indigo-400 underline tracking-widest">HOÀN TÁC</button>`;
+                document.body.appendChild(toast);
+                
+                const timer = setTimeout(() => toast.remove(), 3000);
+                document.getElementById('undo-btn').onclick = () => {
+                    clearTimeout(timer); DB.vocab = backup; DB.save(); this.search(''); toast.remove();
+                };
+            },
+
+            // --- HỆ THỐNG DATA ---
+            renderData(v) {
+                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-4 border border-slate-100">
+                    <button onclick="Core.export()" class="w-full py-5 bg-indigo-50 text-indigo-600 font-black rounded-xl text-xs tracking-widest border border-indigo-100">XUẤT DỮ LIỆU (.JSON)</button>
+                    <button onclick="document.getElementById('imp').click()" class="w-full py-5 bg-slate-50 text-slate-600 font-black rounded-xl text-xs tracking-widest">NHẬP DỮ LIỆU</button>
+                    <input type="file" id="imp" onchange="Core.import(this)" class="hidden">
+                    <div class="mt-10 border-t pt-4">
+                        <button onclick="if(confirm('Xóa sạch kho từ?')){localStorage.clear();location.reload()}" class="w-full text-rose-300 text-[10px] font-black uppercase tracking-widest">Xóa toàn bộ bộ nhớ</button>
                     </div>
-                    <button onclick="deleteItem(${item.id})" class="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-400 rounded-full hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black shadow-inner">X</button>
-                </div>
-            `).join('');
-            v.innerHTML = `<div class="h-full overflow-y-auto custom-scroll">${items || '<p class="text-center mt-12 opacity-25 font-bold animate-pulse">Trống</p>'}</div>`;
-        }
+                </div>`;
+            },
 
-        function deleteItem(id) {
-            if(confirm("Xóa bảo bối này khỏi kho Vô Hạn?")) {
-                db.data = db.data.filter(i => i.id !== id);
-                db.save();
-                router('list');
-            }
-        }
+            updateStreak() {
+                const today = new Date().toDateString();
+                if(DB.meta.lastDate !== today) {
+                    const last = new Date(DB.meta.lastDate);
+                    DB.meta.streak = ((new Date() - last) / 86400000 <= 1.5) ? DB.meta.streak + 1 : 1;
+                    DB.meta.lastDate = today;
+                }
+            },
 
-        window.onkeydown = (e) => {
-            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
-                if(e.key === 'Enter' && e.target.id === 'in-en') addSingle();
-                return;
-            }
-            if (state.view === 'study' && state.flipped) {
-                if (e.key === 'q' || e.key === 'Q') { processReview(false); e.preventDefault(); }
-                if (e.key === '1' || e.key === 'Enter') { processReview(true); e.preventDefault(); }
-            }
-            if (e.code === 'Space' || e.key === 'Enter') {
-                if (state.view === 'study' && !state.flipped) { e.preventDefault(); flip(); }
+            export() {
+                const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'});
+                const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'Vocabulary_Backup.json'; a.click();
+            },
+
+            import(el) {
+                const r = new FileReader(); r.onload = (e) => {
+                    const d = JSON.parse(e.target.result); DB.vocab = d.v; DB.meta = d.m; DB.save(); location.reload();
+                }; r.readAsText(el.files[0]);
             }
         };
 
-        router('study');
+        // --- KEYBOARD ENGINE (Bộ não phím tắt) ---
+        window.onkeydown = (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
+                return;
+            }
+            const key = e.key.toLowerCase();
+            if (key === 's') Core.route('study');
+            if (key === 'n') Core.route('nexus');
+            if (key === 'v') Core.route('vault');
+            
+            if (Core.state.view === 'study' && Core.state.queue.length > 0) {
+                if (e.code === 'Space' || key === 'f') { e.preventDefault(); Core.flip(); }
+                if (Core.state.flipped) {
+                    if (key === '1') Core.ans(0); if (key === '2') Core.ans(1);
+                    if (key === '3') Core.ans(3); if (key === '4') Core.ans(5);
+                }
+            }
+        };
+
+        // Khởi động
+        Core.route('study');
     </script>
 </body>
 </html>
