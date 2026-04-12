@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KHAI PHÓNG v20 - AUTO TRANSLATE + BULK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: sans-serif; background: #f1f5f9; color: #0f172a; }
+        .tab-active { background: #4f46e5 !important; color: white !important; }
+        .card { perspective: 1000px; height: 350px; cursor: pointer; }
+        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.4s; transform-style: preserve-3d; }
+        .is-flipped { transform: rotateY(180deg); }
+        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 24px; border: 1px solid #e2e8f0; font-size: 2.5rem; font-weight: 800; background: white; padding: 20px; text-align: center; }
+        .face-back { transform: rotateY(180deg); background: #4f46e5; color: white; }
+    </style>
+</head>
+<body class="flex flex-col items-center p-4">
+
+    <div class="w-full max-w-md flex flex-col h-[95dvh]">
+        <div class="flex justify-between items-center mb-4 px-2">
+            <h1 class="text-xl font-black italic text-indigo-600">KP V20</h1>
+            <p id="count" class="text-xs font-bold text-slate-400 uppercase tracking-widest"></p>
+        </div>
+
+        <main id="app" class="flex-grow overflow-hidden relative bg-white rounded-[32px] shadow-xl border border-slate-200 p-6"></main>
+
+        <nav class="mt-4 flex gap-2 bg-slate-200 p-1 rounded-2xl">
+            <button onclick="router('study')" id="m-study" class="flex-1 py-3 rounded-xl font-bold transition">HỌC</button>
+            <button onclick="router('add')" id="m-add" class="flex-1 py-3 rounded-xl font-bold transition text-sm">THÊM TỪ</button>
+            <button onclick="router('list')" id="m-list" class="flex-1 py-3 rounded-xl font-bold transition">KHO</button>
+        </nav>
+    </div>
+
+    <script>
+        const db = {
+            data: JSON.parse(localStorage.getItem('KP_V20_DATA')) || [],
+            save() {
+                localStorage.setItem('KP_V20_DATA', JSON.stringify(this.data));
+                document.getElementById('count').innerText = this.data.length + " OBJECTS";
+            }
+        };
+
+        let state = { view: '', idx: 0, flipped: false, queue: [] };
+
+        async function translate(word) {
+            if(!word) return "";
+            try {
+                const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(word)}`);
+                const data = await res.json();
+                return data[0][0][0].toLowerCase();
+            } catch { return ""; }
+        }
+
+        function router(view) {
+            state.view = view;
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById('m-' + view).classList.add('tab-active');
+            const container = document.getElementById('app');
+            container.innerHTML = '';
+
+            if (view === 'add') renderAdd(container);
+            if (view === 'list') renderList(container);
+            if (view === 'study') renderStudy(container);
+            db.save();
+        }
+
+        function renderAdd(v) {
+            v.innerHTML = `
+                <div class="h-full flex flex-col space-y-4">
+                    <div class="bg-indigo-50 p-4 rounded-2xl">
+                        <p class="text-[10px] font-bold text-indigo-400 mb-2 uppercase">Nhập lẻ (Tự động dịch)</p>
+                        <input id="in-en" placeholder="English..." class="w-full p-3 rounded-xl border-none outline-none font-bold text-lg mb-2">
+                        <input id="in-vi" placeholder="Nghĩa tiếng Việt..." class="w-full p-3 rounded-xl border-none outline-none text-indigo-600 font-medium">
+                        <button onclick="addSingle()" class="w-full mt-2 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm">LƯU TỪ NÀY</button>
+                    </div>
+                    
+                    <div class="flex-grow flex flex-col">
+                        <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase">Nhập nhanh (từ : nghĩa)</p>
+                        <textarea id="bulk-input" class="flex-grow w-full p-4 bg-slate-50 border-none rounded-2xl outline-none text-sm font-mono" placeholder="apple : táo&#10;banana : chuối"></textarea>
+                        <button onclick="handleImport()" class="w-full mt-2 py-3 bg-slate-800 text-white rounded-xl font-black text-sm uppercase">Xác nhận nhập lô</button>
+                    </div>
+                </div>
+            `;
+            
+            const enInput = document.getElementById('in-en');
+            let timer;
+            enInput.oninput = () => {
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    document.getElementById('in-vi').value = await translate(enInput.value.trim());
+                }, 500);
+            };
+        }
+
+        function addSingle() {
+            const en = document.getElementById('in-en').value.trim();
+            const vi = document.getElementById('in-vi').value.trim();
+            if(en && vi) {
+                db.data.push({ id: Date.now(), en, vi });
+                db.save();
+                router('add');
+            }
+        }
+
+        function handleImport() {
+            const input = document.getElementById('bulk-input').value;
+            input.split('\n').forEach(line => {
+                const parts = line.split(':');
+                if (parts.length >= 2) {
+                    const en = parts[0].trim(), vi = parts[1].trim();
+                    if (en && vi) db.data.push({ id: Date.now() + Math.random(), en, vi });
+                }
+            });
+            db.save();
+            router('list');
+        }
+
+        function renderStudy(v) {
+            if (db.data.length === 0) return v.innerHTML = `<div class="h-full flex items-center justify-center font-bold text-slate-300">TRỐNG</div>`;
+            if (state.queue.length === 0 || state.idx >= state.queue.length) {
+                state.queue = [...db.data].sort(() => Math.random() - 0.5);
+                state.idx = 0;
+            }
+            const item = state.queue[state.idx];
+            state.flipped = false;
+            v.innerHTML = `
+                <div class="h-full flex flex-col">
+                    <div class="card" onclick="flip()">
+                        <div id="card-inner" class="card-inner">
+                            <div class="face">${item.en}</div>
+                            <div class="face face-back">${item.vi}</div>
+                        </div>
+                    </div>
+                    <button onclick="next()" class="w-full mt-auto py-5 bg-slate-900 text-white rounded-[20px] font-black text-xl">TIẾP THEO (Space)</button>
+                </div>
+            `;
+        }
+
+        function flip() {
+            state.flipped = !state.flipped;
+            const el = document.getElementById('card-inner');
+            if(el) el.classList.toggle('is-flipped', state.flipped);
+        }
+
+        function next() {
+            if (!state.flipped) flip();
+            else { state.idx++; renderStudy(document.getElementById('app')); }
+        }
+
+        function renderList(v) {
+            const items = db.data.slice().reverse().map(item => `
+                <div class="flex justify-between items-center p-4 border-b border-slate-100">
+                    <div class="text-sm"><b class="text-indigo-600">${item.en}</b> <span class="text-slate-300 mx-2">|</span> ${item.vi}</div>
+                    <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-red-500 text-xs font-bold">XÓA</button>
+                </div>
+            `).join('');
+            v.innerHTML = `<div class="h-full overflow-y-auto">${items || '<p class="text-center mt-10 opacity-20">Trống</p>'}</div>`;
+        }
+
+        function deleteItem(id) {
+            db.data = db.data.filter(i => i.id !== id);
+            db.save();
+            router('list');
+        }
+
+        window.onkeydown = (e) => {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                if(e.key === 'Enter' && e.target.id === 'in-en') addSingle();
+                return;
+            }
+            if (e.code === 'Space' || e.key === 'Enter') {
+                if (state.view === 'study') { e.preventDefault(); next(); }
+            }
+        };
+
+        router('study');
+    </script>
+</body>
+</html>
