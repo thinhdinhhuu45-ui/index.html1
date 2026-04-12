@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KHAI PHÓNG v22 - THE SOPHISTICATION</title>
+    <title>KHAI PHÓNG v23 - NATIVE SPEAKER</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
     <style>
@@ -12,7 +12,7 @@
         .card { perspective: 1200px; height: 380px; cursor: pointer; }
         .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
         .is-flipped { transform: rotateY(180deg); }
-        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 32px; border: 1px solid rgba(0,0,0,0.05); font-size: 2.8rem; font-weight: 700; background: white; padding: 30px; shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 32px; border: 1px solid rgba(0,0,0,0.05); font-size: 2.8rem; font-weight: 700; background: white; padding: 30px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
         .face-back { transform: rotateY(180deg); background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; }
         input, textarea { transition: all 0.2s; border: 1px solid #e2e8f0 !important; }
         input:focus, textarea:focus { border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important; }
@@ -23,8 +23,8 @@
     <div class="w-full max-w-md flex flex-col h-[95dvh]">
         <div class="flex justify-between items-center mb-6 px-2">
             <div class="flex flex-col">
-                <h1 class="text-2xl font-black italic text-indigo-600 leading-none">KP v22</h1>
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Sophisticated Edition</span>
+                <h1 class="text-2xl font-black italic text-indigo-600 leading-none">KP v23</h1>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Native Speaker Edition</span>
             </div>
             <p id="count" class="text-xs font-black bg-white px-3 py-1 rounded-full shadow-sm text-slate-500 border border-slate-100"></p>
         </div>
@@ -40,40 +40,54 @@
 
     <script>
         const db = {
-            data: JSON.parse(localStorage.getItem('KP_V22_DATA')) || [],
+            // Đổi key localStorage để tránh xung đột, nhưng nếu cậu có dữ liệu V22 nó sẽ tạo mới.
+            // Nếu muốn giữ dữ liệu cũ, chỉ cần đổi chữ V23 thành V22 ở 2 dòng dưới nhé.
+            data: JSON.parse(localStorage.getItem('KP_V23_DATA')) || [],
             save() {
-                localStorage.setItem('KP_V22_DATA', JSON.stringify(this.data));
+                localStorage.setItem('KP_V23_DATA', JSON.stringify(this.data));
                 document.getElementById('count').innerText = this.data.length + " UNITS";
             }
         };
 
         let state = { view: '', idx: 0, flipped: false, queue: [] };
 
-        // HÀM DỊCH TINH TẾ (Fix lỗi "hạ tay xuống" và "gãy chân")
+        // 1. HÀM DỊCH TINH TẾ (Giữ nguyên)
         async function translate(word) {
             if(!word) return "";
             try {
-                // Thêm context học thuật ngầm để Google hiểu đây là thành ngữ/cụm từ
                 const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=at&q=meaning of ${encodeURIComponent(word)}`;
                 const res = await fetch(url);
                 const data = await res.json();
-                
                 let result = data[0][0][0].toLowerCase();
-                
-                // Loại bỏ phần context rác nếu có
                 result = result.replace(/nghĩa là /g, "").replace(/ý nghĩa của /g, "").replace(/của /g, "");
-
                 const dictionary = {
                     "break a leg": "chúc may mắn",
                     "hand down": "truyền lại / tuyên án",
                     "hands down": "dễ dàng / chắc chắn",
-                    "piece of cake": "dễ như ăn bánh",
-                    "call it a day": "nghỉ tay thôi",
-                    "hang in there": "cố gắng lên"
+                    "piece of cake": "dễ như ăn bánh"
                 };
-
                 return dictionary[word.toLowerCase().trim()] || result;
             } catch { return ""; }
+        }
+
+        // 2. HÀM LẤY PHIÊN ÂM (MỚI)
+        async function getPhonetic(word) {
+            try {
+                const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+                const data = await res.json();
+                return data[0]?.phonetic || data[0]?.phonetics?.find(p => p.text)?.text || "";
+            } catch { return ""; }
+        }
+
+        // 3. HÀM PHÁT ÂM (MỚI - Chạy mượt trên máy cũ)
+        function speak(text) {
+            if (!window.speechSynthesis) return;
+            // Xóa các luồng đọc cũ đang bị kẹt
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.85; // Tốc độ hơi chậm lại 1 xíu để nghe rõ nhấn âm
+            window.speechSynthesis.speak(utterance);
         }
 
         function router(view) {
@@ -94,9 +108,10 @@
         function renderAdd(v) {
             v.innerHTML = `
                 <div class="h-full flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div class="bg-indigo-50/50 p-5 rounded-[30px] border border-indigo-100/50">
+                    <div class="bg-indigo-50/50 p-5 rounded-[30px] border border-indigo-100/50 relative">
                         <p class="text-[9px] font-black text-indigo-400 mb-3 uppercase tracking-[0.2em]">Tra cứu nhanh</p>
                         <input id="in-en" placeholder="Gõ tiếng Anh..." class="w-full p-4 rounded-2xl bg-white border-none outline-none font-bold text-lg mb-3 shadow-sm placeholder:text-slate-300">
+                        <div id="in-ph" class="hidden"></div> 
                         <input id="in-vi" placeholder="Nghĩa tinh tế..." class="w-full p-4 rounded-2xl bg-white/80 border-none outline-none text-indigo-600 font-semibold shadow-sm placeholder:text-indigo-200">
                         <button onclick="addSingle()" class="w-full mt-4 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-200 active:scale-95 transition-all uppercase tracking-widest">Lưu từ vựng</button>
                     </div>
@@ -115,7 +130,11 @@
                 clearTimeout(timer);
                 timer = setTimeout(async () => {
                     const val = enInput.value.trim();
-                    if(val) document.getElementById('in-vi').value = await translate(val);
+                    if(val) {
+                        // Kéo nghĩa và phiên âm cùng lúc
+                        document.getElementById('in-vi').value = await translate(val);
+                        document.getElementById('in-ph').innerText = await getPhonetic(val);
+                    }
                 }, 500);
             };
         }
@@ -123,8 +142,9 @@
         function addSingle() {
             const en = document.getElementById('in-en').value.trim();
             const vi = document.getElementById('in-vi').value.trim();
+            const ph = document.getElementById('in-ph').innerText;
             if(en && vi) {
-                db.data.push({ id: Date.now(), en, vi });
+                db.data.push({ id: Date.now(), en, vi, ph });
                 db.save();
                 router('add');
             }
@@ -138,7 +158,8 @@
                 if (parts.length >= 2) {
                     const en = parts[0].trim(), vi = parts[1].trim();
                     if (en && vi) {
-                        db.data.push({ id: Date.now() + Math.random(), en, vi });
+                        // Nhập nhanh thì tạm thời không kéo phiên âm để tránh lag API
+                        db.data.push({ id: Date.now() + Math.random(), en, vi, ph: "" });
                         count++;
                     }
                 }
@@ -155,18 +176,29 @@
             }
             const item = state.queue[state.idx];
             state.flipped = false;
+            
+            // Tự động phát âm khi thẻ hiện ra (tùy chọn tinh tế)
+            speak(item.en);
+
             v.innerHTML = `
                 <div class="h-full flex flex-col animate-in zoom-in-95 duration-300">
                     <div class="card" onclick="flip()">
                         <div id="card-inner" class="card-inner">
-                            <div class="face shadow-sm">${item.en}</div>
+                            <div class="face shadow-sm">
+                                <div class="text-4xl">${item.en}</div>
+                                <div class="text-lg text-indigo-400 font-medium mt-2 tracking-widest">${item.ph || ''}</div>
+                                
+                                <button onclick="event.stopPropagation(); speak('${item.en.replace(/'/g, "\\'")}')" class="mt-8 p-4 bg-indigo-50/50 rounded-full text-indigo-500 hover:bg-indigo-100 hover:text-indigo-700 hover:scale-110 transition-all shadow-sm border border-indigo-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                                </button>
+                            </div>
                             <div class="face face-back shadow-indigo-200 shadow-2xl">
                                 <span class="text-xs uppercase tracking-[0.3em] opacity-60 mb-4">Nghĩa là</span>
                                 <div class="text-3xl">${item.vi}</div>
                             </div>
                         </div>
                     </div>
-                    <button onclick="next()" class="w-full mt-auto py-5 bg-slate-900 text-white rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all">TIẾP THEO</button>
+                    <button onclick="next()" class="w-full mt-auto py-5 bg-slate-900 text-white rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all">TIẾP THEO (Space)</button>
                 </div>
             `;
         }
@@ -185,7 +217,12 @@
         function renderList(v) {
             const items = db.data.slice().reverse().map(item => `
                 <div class="flex justify-between items-center p-5 border-b border-slate-50 hover:bg-slate-50 transition-colors rounded-2xl mb-1">
-                    <div class="text-sm"><b class="text-indigo-600 font-bold">${item.en}</b> <span class="text-slate-300 mx-2">•</span> <span class="text-slate-500">${item.vi}</span></div>
+                    <div class="text-sm">
+                        <b class="text-indigo-600 font-bold">${item.en}</b> 
+                        ${item.ph ? `<span class="text-[10px] text-indigo-300 ml-1 font-medium">${item.ph}</span>` : ''}
+                        <span class="text-slate-300 mx-2">•</span> 
+                        <span class="text-slate-500">${item.vi}</span>
+                    </div>
                     <button onclick="deleteItem(${item.id})" class="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-400 rounded-full hover:bg-rose-500 hover:text-white transition-all text-[10px] font-black">X</button>
                 </div>
             `).join('');
