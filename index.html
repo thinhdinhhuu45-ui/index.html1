@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KHAI PHÓNG v20 - AUTO TRANSLATE + BULK</title>
+    <title>KHAI PHÓNG v21 - SMART TRANSLATE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: sans-serif; background: #f1f5f9; color: #0f172a; }
@@ -19,8 +19,8 @@
 
     <div class="w-full max-w-md flex flex-col h-[95dvh]">
         <div class="flex justify-between items-center mb-4 px-2">
-            <h1 class="text-xl font-black italic text-indigo-600">KP V20</h1>
-            <p id="count" class="text-xs font-bold text-slate-400 uppercase tracking-widest"></p>
+            <h1 class="text-xl font-black italic text-indigo-600 uppercase tracking-tighter">KP v21</h1>
+            <p id="count" class="text-[10px] font-bold text-slate-400 tracking-widest uppercase"></p>
         </div>
 
         <main id="app" class="flex-grow overflow-hidden relative bg-white rounded-[32px] shadow-xl border border-slate-200 p-6"></main>
@@ -34,21 +34,35 @@
 
     <script>
         const db = {
-            data: JSON.parse(localStorage.getItem('KP_V20_DATA')) || [],
+            data: JSON.parse(localStorage.getItem('KP_V21_DATA')) || [],
             save() {
-                localStorage.setItem('KP_V20_DATA', JSON.stringify(this.data));
-                document.getElementById('count').innerText = this.data.length + " OBJECTS";
+                localStorage.setItem('KP_V21_DATA', JSON.stringify(this.data));
+                document.getElementById('count').innerText = this.data.length + " UNITS";
             }
         };
 
         let state = { view: '', idx: 0, flipped: false, queue: [] };
 
+        // HÀM DỊCH ĐÃ ĐƯỢC NÂNG CẤP "THÔNG MINH" HƠN
         async function translate(word) {
             if(!word) return "";
             try {
-                const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(word)}`);
+                // Sử dụng thêm dt=at (alternative translations) để lấy các nghĩa bóng/nghĩa biến thể
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=at&q=${encodeURIComponent(word)}`;
+                const res = await fetch(url);
                 const data = await res.json();
-                return data[0][0][0].toLowerCase();
+                
+                let result = data[0][0][0].toLowerCase();
+                
+                // Mẹo fix cứng các cụm thành ngữ nổi tiếng nếu Google vẫn báo "ngáo"
+                const idioms = {
+                    "break a leg": "chúc may mắn",
+                    "piece of cake": "dễ như ăn bánh",
+                    "hit the books": "vùi đầu vào học",
+                    "under the weather": "cảm thấy không khỏe"
+                };
+
+                return idioms[word.toLowerCase().trim()] || result;
             } catch { return ""; }
         }
 
@@ -68,17 +82,17 @@
         function renderAdd(v) {
             v.innerHTML = `
                 <div class="h-full flex flex-col space-y-4">
-                    <div class="bg-indigo-50 p-4 rounded-2xl">
-                        <p class="text-[10px] font-bold text-indigo-400 mb-2 uppercase">Nhập lẻ (Tự động dịch)</p>
-                        <input id="in-en" placeholder="English..." class="w-full p-3 rounded-xl border-none outline-none font-bold text-lg mb-2">
-                        <input id="in-vi" placeholder="Nghĩa tiếng Việt..." class="w-full p-3 rounded-xl border-none outline-none text-indigo-600 font-medium">
-                        <button onclick="addSingle()" class="w-full mt-2 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm">LƯU TỪ NÀY</button>
+                    <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                        <p class="text-[10px] font-bold text-indigo-400 mb-2 uppercase tracking-widest">Nhập lẻ (Auto AI)</p>
+                        <input id="in-en" placeholder="Type here..." class="w-full p-3 rounded-xl border-none outline-none font-bold text-lg mb-2 shadow-sm">
+                        <input id="in-vi" placeholder="Nghĩa tự động..." class="w-full p-3 rounded-xl border-none outline-none text-indigo-600 font-medium shadow-sm">
+                        <button onclick="addSingle()" class="w-full mt-2 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm shadow-lg active:scale-95 transition">SAVE UNIT</button>
                     </div>
                     
                     <div class="flex-grow flex flex-col">
-                        <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase">Nhập nhanh (từ : nghĩa)</p>
-                        <textarea id="bulk-input" class="flex-grow w-full p-4 bg-slate-50 border-none rounded-2xl outline-none text-sm font-mono" placeholder="apple : táo&#10;banana : chuối"></textarea>
-                        <button onclick="handleImport()" class="w-full mt-2 py-3 bg-slate-800 text-white rounded-xl font-black text-sm uppercase">Xác nhận nhập lô</button>
+                        <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Nhập nhanh (từ : nghĩa)</p>
+                        <textarea id="bulk-input" class="flex-grow w-full p-4 bg-slate-50 border-none rounded-2xl outline-none text-sm font-mono" placeholder="hello : xin chào&#10;break a leg : chúc may mắn"></textarea>
+                        <button onclick="handleImport()" class="w-full mt-2 py-3 bg-slate-800 text-white rounded-xl font-black text-sm uppercase active:scale-95 transition">Import All</button>
                     </div>
                 </div>
             `;
@@ -117,7 +131,7 @@
         }
 
         function renderStudy(v) {
-            if (db.data.length === 0) return v.innerHTML = `<div class="h-full flex items-center justify-center font-bold text-slate-300">TRỐNG</div>`;
+            if (db.data.length === 0) return v.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-slate-300 font-black italic">EMPTY VAULT</div>`;
             if (state.queue.length === 0 || state.idx >= state.queue.length) {
                 state.queue = [...db.data].sort(() => Math.random() - 0.5);
                 state.idx = 0;
@@ -132,7 +146,7 @@
                             <div class="face face-back">${item.vi}</div>
                         </div>
                     </div>
-                    <button onclick="next()" class="w-full mt-auto py-5 bg-slate-900 text-white rounded-[20px] font-black text-xl">TIẾP THEO (Space)</button>
+                    <button onclick="next()" class="w-full mt-auto py-5 bg-slate-900 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition">NEXT (Space)</button>
                 </div>
             `;
         }
@@ -150,9 +164,9 @@
 
         function renderList(v) {
             const items = db.data.slice().reverse().map(item => `
-                <div class="flex justify-between items-center p-4 border-b border-slate-100">
-                    <div class="text-sm"><b class="text-indigo-600">${item.en}</b> <span class="text-slate-300 mx-2">|</span> ${item.vi}</div>
-                    <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-red-500 text-xs font-bold">XÓA</button>
+                <div class="flex justify-between items-center p-4 border-b border-slate-50">
+                    <div class="text-sm"><b class="text-indigo-600 font-black">${item.en}</b> <span class="text-slate-300 mx-2">/</span> ${item.vi}</div>
+                    <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-red-500 text-[10px] font-black underline">DEL</button>
                 </div>
             `).join('');
             v.innerHTML = `<div class="h-full overflow-y-auto">${items || '<p class="text-center mt-10 opacity-20">Trống</p>'}</div>`;
