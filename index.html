@@ -200,7 +200,6 @@
                         <textarea id="in-batch" placeholder="hi:chào&#10;hello:xin chào" class="flex-grow w-full p-4 bg-white/50 border-2 border-white rounded-xl outline-none focus:border-indigo-400 font-bold text-sm custom-scroll"></textarea>
                         <button onclick="Core.batchAdd()" class="mt-2 bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md active:scale-95">LƯU TẤT CẢ [ENTER TRÊN Ô]</button>
                     </div>
-                    <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic text-center">Tự động tra cứu khi nhập ô đơn...</div>
                 </div>`;
                 
                 const en = document.getElementById('in-en'); en.focus();
@@ -223,7 +222,6 @@
                             const ipa = i?.[0]?.phonetic || '';
                             DB.cache.set(val, {vi: mean, ipa});
                             document.getElementById('in-vi').value = mean;
-                            document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
                             window.curInf = {ipa};
                         } catch(e) {}
                     }, 450);
@@ -244,32 +242,43 @@
                     if (line.includes(':')) {
                         const [en, vi] = line.split(':');
                         if (en.trim() && vi.trim()) {
-                            DB.vocab.push({ 
-                                id: Date.now() + Math.random(), 
-                                en: en.trim(), 
-                                vi: vi.trim(), 
-                                ipa: '', reps: 0, s: 0, d: 0, laps: 0, interval: 0, 
-                                next: Date.now(), trash: false 
-                            });
+                            DB.vocab.push({ id: Date.now() + Math.random(), en: en.trim(), vi: vi.trim(), ipa: '', reps: 0, s: 0, d: 0, laps: 0, interval: 0, next: Date.now(), trash: false });
                             count++;
                         }
                     }
                 });
-                if (count > 0) {
-                    DB.save();
-                    area.value = '';
-                    alert(`Đã nạp thành công ${count} từ!`);
-                }
+                if (count > 0) { DB.save(); area.value = ''; alert(`Đã nạp ${count} từ!`); }
             },
             renderVault(v) {
-                v.innerHTML = `<div class="flex gap-2 mb-2"><input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="flex-grow p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><button onclick="Core.toggleTrash()" id="trash-btn" class="px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]">THÙNG RÁC</button></div><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                v.innerHTML = `
+                <div class="flex flex-col gap-2 mb-2">
+                    <input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm">
+                    <div class="flex gap-1.5">
+                        <button onclick="Core.toggleTrash()" id="trash-btn" class="flex-grow py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase">THÙNG RÁC</button>
+                        <button onclick="Core.clearVault()" class="px-6 py-3 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl font-black text-[10px] uppercase">XÓA HẾT</button>
+                    </div>
+                </div>
+                <div id="v-list" class="overflow-y-auto max-h-[60vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
+            },
+            clearVault() {
+                const isT = this.state.isTrashView;
+                const msg = isT ? "BẠN MUỐN XÓA VĨNH VIỄN TẤT CẢ TỪ TRONG THÙNG RÁC?" : "BẠN MUỐN CHUYỂN TẤT CẢ TỪ VÀO THÙNG RÁC?";
+                if(!confirm(msg)) return;
+
+                if(isT) {
+                    DB.vocab = DB.vocab.filter(i => !i.trash);
+                } else {
+                    DB.vocab.forEach(i => i.trash = true);
+                }
+                DB.save();
+                this.search(document.getElementById('v-search').value);
             },
             toggleTrash() {
                 this.state.isTrashView = !this.state.isTrashView;
                 const btn = document.getElementById('trash-btn');
                 btn.innerText = this.state.isTrashView ? "QUAY LẠI" : "THÙNG RÁC";
-                btn.className = this.state.isTrashView ? "px-4 bg-orange-500 text-white rounded-xl font-black text-[10px]" : "px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]";
+                btn.className = this.state.isTrashView ? "flex-grow py-3 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase" : "flex-grow py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase";
                 this.search(document.getElementById('v-search').value);
             },
             search(q) {
@@ -320,31 +329,20 @@
         window.onkeydown = (e) => {
             const k = e.key.toLowerCase();
             const focused = document.activeElement;
-            
-            // Xử lý riêng cho ô nhập batch
             if (focused.id === 'in-batch') {
-                if (e.key === 'Enter' && !e.shiftKey) { 
-                    e.preventDefault(); 
-                    Core.batchAdd(); 
-                }
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Core.batchAdd(); }
                 return;
             }
-
-            // Phím tắt điều hướng (chỉ khi không trong input)
             const isInInput = ['INPUT', 'TEXTAREA'].includes(focused.tagName);
             if (!isInInput && ['a','s','d','f'].includes(k)) { 
                 e.preventDefault(); 
                 if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); 
                 return;
             }
-
-            // Xử lý trong Nexus khi gõ Enter ô đơn
             if (focused.id === 'in-en' || focused.id === 'in-vi') {
                 if (e.key === 'Enter') Core.add();
                 return;
             }
-
-            // Xử lý trong Study
             if (Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
                 if(Core.state.flipped) {
