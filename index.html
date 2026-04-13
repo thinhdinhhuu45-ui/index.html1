@@ -3,38 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KP v-PRO MAX | FSRS v5</title>
+    <title>KP v-PRO MAX | DARK</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
     <style>
-        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
+        body { font-family: ui-sans-serif, system-ui, sans-serif; transition: background 0.3s, color 0.3s; }
         .tab-active { background: #1e293b !important; color: white !important; border-color: #1e293b !important; }
-        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 16px; width: 100%; transition: all 0.2s; }
+        .dark .tab-active { background: #6366f1 !important; color: white !important; border-color: #6366f1 !important; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; border-radius: 16px; width: 100%; transition: all 0.2s; }
         .heat-map { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; }
         .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
+        .dark .heat-cell { background: #334155; }
         .hidden { display: none !important; }
         .custom-scroll::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="flex justify-center p-2 sm:p-4">
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex justify-center p-2 sm:p-4">
     <div class="w-full max-w-lg flex flex-col h-[98dvh]">
-        <header class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
+        <header class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
             <div class="flex flex-col">
                 <div class="flex items-center gap-2">
                     <span class="font-black text-orange-500 text-lg">🔥 <span id="streak">0</span></span>
-                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">FSRS v5</span>
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter bg-slate-100 dark:bg-slate-800 text-slate-500">FSRS v5</span>
                 </div>
                 <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">STABILITY MAX: 0</div>
             </div>
-            <div id="heatmap" class="heat-map w-16 sm:w-20"></div>
+            <div class="flex items-center gap-4">
+                <div id="heatmap" class="heat-map w-16 sm:w-20"></div>
+                <button onclick="Core.toggleTheme()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:scale-110 transition-transform">
+                    <span id="theme-icon">🌙</span>
+                </button>
+            </div>
         </header>
 
         <main id="view" class="flex-grow overflow-hidden relative"></main>
 
         <nav class="mt-2 grid grid-cols-4 gap-1.5">
-            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [A]</button>
-            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [S]</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [D]</button>
-            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data [F]</button>
+            <button onclick="Core.route('study')" id="n-study" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 rounded-xl font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Study [A]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 rounded-xl font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Nexus [S]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 rounded-xl font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Vault [D]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data [F]</button>
         </nav>
     </div>
 
@@ -43,7 +53,7 @@
 
         const DB = {
             vocab: [],
-            meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9, retention: 0.9 },
+            meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9, retention: 0.9, dark: false },
             cache: new Map(), timer: null,
             async init() {
                 return new Promise((resolve) => {
@@ -54,7 +64,9 @@
                         const store = this.idb.transaction("store", "readonly").objectStore("store");
                         const v = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
                         const m = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
-                        if (v) this.vocab = v; if (m) Object.assign(this.meta, m); resolve();
+                        if (v) this.vocab = v; if (m) Object.assign(this.meta, m);
+                        this.applyTheme();
+                        resolve();
                     };
                 });
             },
@@ -63,6 +75,15 @@
                 tx.objectStore("store").put(this.vocab, "vocab");
                 tx.objectStore("store").put(this.meta, "meta");
                 this.updateUI();
+            },
+            applyTheme() {
+                if (this.meta.dark) {
+                    document.documentElement.classList.add('dark');
+                    document.getElementById('theme-icon').innerText = '☀️';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.getElementById('theme-icon').innerText = '🌙';
+                }
             },
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
@@ -77,7 +98,7 @@
                     const count = this.meta.history[d.toDateString()] || 0;
                     const cell = document.createElement('div');
                     cell.className = 'heat-cell';
-                    if(count > 0) cell.style.background = `rgba(79, 70, 229, ${Math.min(0.2 + count * 0.15, 1)})`;
+                    if(count > 0) cell.style.background = `rgba(99, 102, 241, ${Math.min(0.2 + count * 0.15, 1)})`;
                     h.appendChild(cell);
                 }
             }
@@ -85,6 +106,11 @@
 
         const Core = {
             state: { view: '', flipped: false, queue: [], isTrashView: false },
+            toggleTheme() {
+                DB.meta.dark = !DB.meta.dark;
+                DB.applyTheme();
+                DB.save();
+            },
             speak(txt) {
                 window.speechSynthesis.cancel();
                 const msg = new SpeechSynthesisUtterance(txt);
@@ -104,7 +130,7 @@
             renderStudy(v) {
                 this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
                 if(!this.state.queue.length) {
-                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Xong hết rồi! Nghỉ ngơi đi Hero! 📐</div>`;
+                    v.innerHTML = `<div class="card-side text-slate-400 font-black border-2 border-dashed border-slate-200 dark:border-slate-800 text-xs uppercase px-12 text-center">Hero nghỉ ngơi thôi! 📐</div>`;
                     return;
                 }
                 const item = this.state.queue[0];
@@ -113,35 +139,24 @@
                 v.innerHTML = `
                     <div class="h-full flex flex-col">
                         <div class="relative cursor-pointer" onclick="Core.flip()">
-                            <div id="card-front" class="card-side shadow-sm p-6 text-center">
-                                <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2>
-                                ${needsTyping ? '<div class="mt-4 px-3 py-1 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full">ACTIVE RECALL MODE</div>' : ''}
+                            <div id="card-front" class="card-side bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 p-6 text-center">
+                                <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800 dark:text-slate-100">${item.en}</h2>
+                                ${needsTyping ? '<div class="mt-4 px-3 py-1 bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 text-[8px] font-black rounded-full uppercase">Recall Mode</div>' : ''}
                             </div>
-                            <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
-                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2>
-                                <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
-                                ${needsTyping ? `<input id="recall-input" autocomplete="off" placeholder="Gõ lại từ..." class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 bg-transparent outline-none text-center font-black uppercase text-indigo-600">` : ''}
+                            <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20 dark:bg-indigo-900/10 dark:border-indigo-900">
+                                <h2 class="text-3xl font-black text-indigo-600 dark:text-indigo-400 leading-tight">${item.vi}</h2>
+                                <p class="text-indigo-300 dark:text-indigo-700 font-mono text-xs mt-4 uppercase">${item.ipa||''}</p>
+                                ${needsTyping ? `<input id="recall-input" autocomplete="off" placeholder="Gõ lại..." class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 dark:border-indigo-800 bg-transparent outline-none text-center font-black uppercase text-indigo-600 dark:text-indigo-400">` : ''}
                             </div>
                         </div>
                         <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity">
-                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">AGAIN [1]</button>
-                            <button onclick="Core.ans(2)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">HARD [2]</button>
-                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">GOOD [3]</button>
+                            <button onclick="Core.ans(1)" class="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 py-4 font-black text-[10px] rounded-xl text-slate-400">AGAIN [1]</button>
+                            <button onclick="Core.ans(2)" class="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 py-4 font-black text-[10px] rounded-xl text-slate-400">HARD [2]</button>
+                            <button onclick="Core.ans(3)" class="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 py-4 font-black text-[10px] rounded-xl text-slate-400">GOOD [3]</button>
                             <button onclick="Core.ans(4)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button>
                         </div>
                     </div>`;
-                
-                if (needsTyping) {
-                    setTimeout(() => {
-                        const inp = document.getElementById('recall-input');
-                        if (inp) inp.oninput = (e) => {
-                            if (e.target.value.toLowerCase().trim() === item.en.toLowerCase().trim()) {
-                                e.target.classList.add('text-green-500');
-                                e.target.disabled = true;
-                            }
-                        };
-                    }, 100);
-                }
+                if(needsTyping) setTimeout(() => { const inp = document.getElementById('recall-input'); if(inp) inp.oninput = (e) => { if(e.target.value.toLowerCase().trim() === item.en.toLowerCase().trim()){ e.target.classList.add('text-green-500'); e.target.disabled = true; } }; }, 100);
             },
             flip() {
                 if (this.state.view !== 'study' || !this.state.queue.length) return;
@@ -159,28 +174,18 @@
 
                 let { s, d, reps, laps } = item;
                 if (s === undefined) { s = 0; d = 0; reps = 0; laps = 0; }
-
-                if (reps === 0) {
-                    s = W[g - 1];
-                    d = W[4] - (g - 3) * W[5];
-                } else {
+                if (reps === 0) { s = W[g - 1]; d = W[4] - (g - 3) * W[5]; } else {
                     const r = Math.exp(Math.log(0.9) * (item.interval / s));
                     d = Math.min(10, Math.max(1, d - W[6] * (g - 3)));
                     d = W[4] - W[5] * (g - 3) + (d - W[4]) * W[7];
-                    if (g === 1) {
-                        s = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r));
-                        laps++;
-                    } else {
-                        const h = (g === 2) ? W[15] : (g === 4) ? W[16] : 1;
-                        s = s * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp(W[10] * (1 - r)) - 1) * h);
-                    }
+                    if (g === 1) { s = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r)); laps++; }
+                    else { const h = (g === 2) ? W[15] : (g === 4) ? W[16] : 1; s = s * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp(W[10] * (1 - r)) - 1) * h); }
                 }
                 reps++;
                 const target = DB.meta.retention || 0.9;
                 let i = s / Math.log(0.9) * Math.log(target);
                 let finalI = Math.max(1, Math.round(i * (0.95 + Math.random() * 0.1)));
                 if (g === 1) finalI = 1;
-
                 item.next = Date.now() + (finalI * 86400000);
                 Object.assign(item, { s, d, reps, laps, interval: finalI });
                 const ds = new Date().toDateString(); DB.meta.history[ds] = (DB.meta.history[ds]||0)+1;
@@ -189,40 +194,31 @@
             renderNexus(port) {
                 port.innerHTML = `
                 <div class="h-full flex flex-col gap-3">
-                    <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-3">
-                        <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-3 border-2 border-slate-50 rounded-xl outline-none focus:border-indigo-500 font-black text-xl uppercase tracking-tighter">
-                        <input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-3 border-2 border-slate-50 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-md">
-                        <button onclick="Core.add()" class="bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95">LƯU ĐƠN [ENTER]</button>
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-col gap-3">
+                        <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-3 bg-slate-50 dark:bg-slate-800 dark:text-white border-2 border-transparent rounded-xl outline-none focus:border-indigo-500 font-black text-xl uppercase tracking-tighter">
+                        <input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-3 bg-slate-50 dark:bg-slate-800 dark:text-white border-2 border-transparent rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 dark:text-indigo-400">
+                        <button onclick="Core.add()" class="bg-slate-900 dark:bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">LƯU ĐƠN [ENTER]</button>
                     </div>
-                    
-                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex-grow flex flex-col">
-                        <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">NHẬP NHANH (MỖI DÒNG 1 TỪ - ANH:VIỆT)</label>
-                        <textarea id="in-batch" placeholder="hi:chào&#10;hello:xin chào" class="flex-grow w-full p-4 bg-white/50 border-2 border-white rounded-xl outline-none focus:border-indigo-400 font-bold text-sm custom-scroll"></textarea>
-                        <button onclick="Core.batchAdd()" class="mt-2 bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md active:scale-95">LƯU TẤT CẢ [ENTER TRÊN Ô]</button>
+                    <div class="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 p-4 rounded-2xl flex-grow flex flex-col">
+                        <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">NHẬP NHANH (ANH:VIỆT)</label>
+                        <textarea id="in-batch" placeholder="hi:chào&#10;hello:xin chào" class="flex-grow w-full p-4 bg-white/50 dark:bg-slate-900/50 dark:text-indigo-200 border-2 border-white dark:border-slate-800 rounded-xl outline-none focus:border-indigo-400 font-bold text-sm custom-scroll"></textarea>
+                        <button onclick="Core.batchAdd()" class="mt-2 bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px] shadow-md">LƯU TẤT CẢ [ENTER TRÊN Ô]</button>
                     </div>
                 </div>`;
-                
                 const en = document.getElementById('in-en'); en.focus();
                 en.oninput = () => {
                     const val = en.value.trim().toLowerCase();
                     if(val.length < 2) return;
-                    if(DB.cache.has(val)) { 
-                        const d = DB.cache.get(val); document.getElementById('in-vi').value = d.vi; 
-                        document.getElementById('nexus-info').innerText = 'IPA: ' + (d.ipa || 'N/A'); window.curInf = {ipa: d.ipa}; return; 
-                    }
+                    if(DB.cache.has(val)) { document.getElementById('in-vi').value = DB.cache.get(val).vi; return; }
                     clearTimeout(DB.timer);
                     DB.timer = setTimeout(async () => {
                         try {
-                            const cId = 'gtx' + Math.floor(Math.random()*10000);
                             const [t, i] = await Promise.all([
-                                fetch(`https://translate.googleapis.com/translate_a/single?client=${cId}&sl=en&tl=vi&dt=t&q=${encodeURIComponent(val)}`).then(r => r.json()),
+                                fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${encodeURIComponent(val)}`).then(r => r.json()),
                                 fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
                             ]);
-                            let mean = t?.[0]?.[0]?.[0] || '';
-                            const ipa = i?.[0]?.phonetic || '';
-                            DB.cache.set(val, {vi: mean, ipa});
-                            document.getElementById('in-vi').value = mean;
-                            window.curInf = {ipa};
+                            const mean = t?.[0]?.[0]?.[0] || ''; const ipa = i?.[0]?.phonetic || '';
+                            DB.cache.set(val, {vi: mean, ipa}); document.getElementById('in-vi').value = mean; window.curInf = {ipa};
                         } catch(e) {}
                     }, 450);
                 };
@@ -236,8 +232,7 @@
             },
             batchAdd() {
                 const area = document.getElementById('in-batch');
-                const lines = area.value.split('\n');
-                let count = 0;
+                const lines = area.value.split('\n'); let count = 0;
                 lines.forEach(line => {
                     if (line.includes(':')) {
                         const [en, vi] = line.split(':');
@@ -252,10 +247,10 @@
             renderVault(v) {
                 v.innerHTML = `
                 <div class="flex flex-col gap-2 mb-2">
-                    <input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm">
+                    <input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 bg-white dark:bg-slate-900 dark:text-white border-2 border-slate-100 dark:border-slate-800 rounded-xl outline-none text-sm font-bold shadow-sm">
                     <div class="flex gap-1.5">
-                        <button onclick="Core.toggleTrash()" id="trash-btn" class="flex-grow py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase">THÙNG RÁC</button>
-                        <button onclick="Core.clearVault()" class="px-6 py-3 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl font-black text-[10px] uppercase">XÓA HẾT</button>
+                        <button onclick="Core.toggleTrash()" id="trash-btn" class="flex-grow py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl font-black text-[10px] uppercase">THÙNG RÁC</button>
+                        <button onclick="Core.clearVault()" class="px-6 py-3 bg-rose-50 dark:bg-rose-950/20 text-rose-500 border border-rose-100 dark:border-rose-900 rounded-xl font-black text-[10px] uppercase tracking-tighter">XÓA HẾT</button>
                     </div>
                 </div>
                 <div id="v-list" class="overflow-y-auto max-h-[60vh] custom-scroll flex flex-col gap-1.5"></div>`;
@@ -263,39 +258,31 @@
             },
             clearVault() {
                 const isT = this.state.isTrashView;
-                const msg = isT ? "BẠN MUỐN XÓA VĨNH VIỄN TẤT CẢ TỪ TRONG THÙNG RÁC?" : "BẠN MUỐN CHUYỂN TẤT CẢ TỪ VÀO THÙNG RÁC?";
-                if(!confirm(msg)) return;
-
-                if(isT) {
-                    DB.vocab = DB.vocab.filter(i => !i.trash);
-                } else {
-                    DB.vocab.forEach(i => i.trash = true);
-                }
-                DB.save();
-                this.search(document.getElementById('v-search').value);
+                if(!confirm(isT ? "XÓA VĨNH VIỄN THÙNG RÁC?" : "CHUYỂN TẤT CẢ VÀO THÙNG RÁC?")) return;
+                if(isT) DB.vocab = DB.vocab.filter(i => !i.trash); else DB.vocab.forEach(i => i.trash = true);
+                DB.save(); this.search(document.getElementById('v-search').value);
             },
             toggleTrash() {
                 this.state.isTrashView = !this.state.isTrashView;
                 const btn = document.getElementById('trash-btn');
                 btn.innerText = this.state.isTrashView ? "QUAY LẠI" : "THÙNG RÁC";
-                btn.className = this.state.isTrashView ? "flex-grow py-3 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase" : "flex-grow py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase";
+                btn.className = this.state.isTrashView ? "flex-grow py-3 bg-orange-500 text-white rounded-xl font-black text-[10px] uppercase" : "flex-grow py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl font-black text-[10px] uppercase";
                 this.search(document.getElementById('v-search').value);
             },
             search(q) {
                 const list = document.getElementById('v-list'); if(!list) return;
-                list.innerHTML = '';
-                const query = q.toLowerCase().trim();
+                list.innerHTML = ''; const query = q.toLowerCase().trim();
                 const source = DB.vocab.filter(i => {
                     const m = i.en.toLowerCase().includes(query) || i.vi.includes(query);
                     return this.state.isTrashView ? (i.trash && m) : (!i.trash && m);
                 });
-                source.slice(-40).reverse().forEach(item => {
+                source.slice(-50).reverse().forEach(item => {
                     const div = document.createElement('div');
-                    div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm";
+                    div.className = "flex justify-between items-center p-4 bg-white dark:bg-slate-900 border border-slate-50 dark:border-slate-800 rounded-xl shadow-sm";
                     if (this.state.isTrashView) {
-                        div.innerHTML = `<div class="text-sm font-black text-slate-400 uppercase">${item.en}</div><div class="flex gap-3"><button onclick="Core.restore(${item.id})" class="text-indigo-500 text-[9px] font-black uppercase">KHÔI PHỤC</button><button onclick="Core.kill(${item.id})" class="text-rose-600 text-[9px] font-black uppercase underline">XÓA HẲN</button></div>`;
+                        div.innerHTML = `<div class="text-sm font-black text-slate-400 uppercase">${item.en}</div><div class="flex gap-3"><button onclick="Core.restore(${item.id})" class="text-indigo-500 text-[9px] font-black uppercase">RESTORE</button><button onclick="Core.kill(${item.id})" class="text-rose-600 text-[9px] font-black uppercase">KILL</button></div>`;
                     } else {
-                        div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase">${item.en} <span class="text-indigo-400 ml-1 font-bold">/ ${item.vi}</span></div><button onclick="Core.moveToTrash(${item.id})" class="text-slate-400 text-[9px] font-black uppercase">XÓA</button>`;
+                        div.innerHTML = `<div class="text-sm font-black text-slate-700 dark:text-slate-300 uppercase">${item.en} <span class="text-indigo-400 dark:text-indigo-600 ml-1 font-bold">/ ${item.vi}</span></div><button onclick="Core.moveToTrash(${item.id})" class="text-slate-400 text-[9px] font-black uppercase">XÓA</button>`;
                     }
                     list.appendChild(div);
                 });
@@ -304,7 +291,7 @@
             restore(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = false; DB.save(); this.search(document.getElementById('v-search').value); },
             kill(id) { DB.vocab = DB.vocab.filter(x => x.id !== id); DB.save(); this.search(document.getElementById('v-search').value); },
             renderData(v) {
-                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">FSRS Retention: <span id="r-ret" class="text-indigo-600">${Math.round(DB.meta.retention*100)}</span>%</label><input type="range" min="0.8" max="0.97" step="0.01" value="${DB.meta.retention}" class="w-full accent-indigo-600" oninput="DB.meta.retention=parseFloat(this.value);document.getElementById('r-ret').innerText=Math.round(this.value*100);DB.save()"></div><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
+                v.innerHTML = `<div class="bg-white dark:bg-slate-900 p-8 rounded-2xl flex flex-col gap-6 border border-slate-100 dark:border-slate-800"><div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase block mb-3 text-center">Retention: <span id="r-ret" class="text-indigo-600">${Math.round(DB.meta.retention*100)}</span>%</label><input type="range" min="0.8" max="0.97" step="0.01" value="${DB.meta.retention}" class="w-full accent-indigo-600" oninput="DB.meta.retention=parseFloat(this.value);document.getElementById('r-ret').innerText=Math.round(this.value*100);DB.save()"></div><div class="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase block mb-3 text-center">Speech Rate: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Export</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 font-black rounded-xl text-[10px] uppercase">Import</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
             },
             updateStreak() {
                 const t = new Date().toDateString();
@@ -314,40 +301,19 @@
                     DB.meta.lastDate = t;
                 }
             },
-            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_FSRS_v5.json'; a.click(); },
-            import(el) {
-                const r = new FileReader();
-                r.onload = async (e) => {
-                    const d = JSON.parse(e.target.result);
-                    DB.vocab = d.v; DB.meta = d.m;
-                    await DB.save(); location.reload();
-                };
-                r.readAsText(el.files[0]);
-            }
+            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_DATA.json'; a.click(); },
+            import(el) { const r = new FileReader(); r.onload = async (e) => { const d = JSON.parse(e.target.result); DB.vocab = d.v; DB.meta = d.m; await DB.save(); location.reload(); }; r.readAsText(el.files[0]); }
         };
 
         window.onkeydown = (e) => {
-            const k = e.key.toLowerCase();
-            const focused = document.activeElement;
-            if (focused.id === 'in-batch') {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Core.batchAdd(); }
-                return;
-            }
+            const k = e.key.toLowerCase(); const focused = document.activeElement;
+            if (focused.id === 'in-batch') { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Core.batchAdd(); } return; }
             const isInInput = ['INPUT', 'TEXTAREA'].includes(focused.tagName);
-            if (!isInInput && ['a','s','d','f'].includes(k)) { 
-                e.preventDefault(); 
-                if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); 
-                return;
-            }
-            if (focused.id === 'in-en' || focused.id === 'in-vi') {
-                if (e.key === 'Enter') Core.add();
-                return;
-            }
+            if (!isInInput && ['a','s','d','f'].includes(k)) { e.preventDefault(); if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); return; }
+            if ((focused.id === 'in-en' || focused.id === 'in-vi') && e.key === 'Enter') Core.add();
             if (Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
-                if(Core.state.flipped) {
-                    if(k==='1') Core.ans(1); if(k==='2') Core.ans(2); if(k==='3') Core.ans(3); if(k==='4') Core.ans(4);
-                }
+                if(Core.state.flipped && ['1','2','3','4'].includes(k)) Core.ans(parseInt(k));
             }
         };
 
