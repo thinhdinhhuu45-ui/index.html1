@@ -73,12 +73,16 @@
             },
 
             async save() {
-                const tx = this.idb.transaction("store", "readwrite");
-                tx.objectStore("store").put(this.vocab, "vocab");
-                tx.objectStore("store").put(this.meta, "meta");
-                this.rebuildIndex();
-                this.updateUI();
-            },
+    const tx = this.idb.transaction("store", "readwrite");
+    tx.objectStore("store").put(this.vocab, "vocab");
+    tx.objectStore("store").put(this.meta, "meta");
+    
+    // Bản dự phòng siêu tốc - cứu cánh khi hệ thống chính gặp sự cố
+    localStorage.setItem('KP_BACKUP', JSON.stringify({v: this.vocab, m: this.meta}));
+    
+    this.rebuildIndex();
+    this.updateUI();
+},
 
             rebuildIndex() {
                 this.index.clear();
