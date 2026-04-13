@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KP v-PRO MAX | ULTIMATE</title>
+    <title>KP v-PRO MAX | MERGE EDITION</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
@@ -244,7 +244,48 @@
                 }
             },
             export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Backup.json'; a.click(); },
-            import(el) { const r = new FileReader(); r.onload = async (e) => { const d = JSON.parse(e.target.result); DB.vocab = d.v; DB.meta = d.m; await DB.save(); location.reload(); }; r.readAsText(el.files[0]); }
+            
+            import(el) {
+                const r = new FileReader();
+                r.onload = async (e) => {
+                    try {
+                        const d = JSON.parse(e.target.result);
+                        if(!d.v || !d.m) throw new Error();
+
+                        // 1. Map từ hiện có để check trùng nhanh
+                        const currentWords = new Map();
+                        DB.vocab.forEach(item => currentWords.set(item.en.toLowerCase().trim(), item));
+
+                        // 2. Duyệt dữ liệu mới - Áp dụng luật "Giữ lại từ học nhiều hơn" của ông
+                        d.v.forEach(newWord => {
+                            const key = newWord.en.toLowerCase().trim();
+                            if (currentWords.has(key)) {
+                                const oldWord = currentWords.get(key);
+                                // Giữ lại record có reps cao hơn (tiến trình học xa hơn)
+                                if (newWord.reps > oldWord.reps) Object.assign(oldWord, newWord);
+                            } else {
+                                DB.vocab.push(newWord);
+                            }
+                        });
+
+                        // 3. Hợp nhất Meta (Streak max, gộp History cộng dồn)
+                        DB.meta.streak = Math.max(DB.meta.streak, d.m.streak || 0);
+                        for (let date in d.m.history) {
+                            DB.meta.history[date] = (DB.meta.history[date] || 0) + d.m.history[date];
+                        }
+                        const importedDate = d.m.lastDate ? new Date(d.m.lastDate) : new Date(0);
+                        const currentDate = DB.meta.lastDate ? new Date(DB.meta.lastDate) : new Date(0);
+                        DB.meta.lastDate = (currentDate > importedDate) ? DB.meta.lastDate : d.m.lastDate;
+
+                        await DB.save();
+                        alert("Đã hợp nhất thành công! Dữ liệu của ông giờ là vô đối. 🔥");
+                        location.reload(); 
+                    } catch (err) {
+                        alert("File này 'lạ' quá, không gộp được ông ơi! ❌");
+                    }
+                };
+                r.readAsText(el.files[0]);
+            }
         };
 
         window.onkeydown = (e) => {
