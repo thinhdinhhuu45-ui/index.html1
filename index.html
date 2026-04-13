@@ -50,8 +50,8 @@
         </nav>
     </div>
 
-    <audio id="rain-audio" loop>
-        <source src="https://actions.google.com/sounds/v1/water/rain_on_roof.ogg" type="audio/mpeg">
+    <audio id="rain-audio" loop preload="auto">
+        <source src="https://www.soundjay.com/nature/rain-01.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -89,7 +89,12 @@
             unlockAudio() {
                 if(this.state.unlocked) return;
                 const rain = document.getElementById('rain-audio');
-                rain.play().then(() => { rain.pause(); this.state.unlocked = true; }).catch(()=>{});
+                // Ép trình duyệt ghi nhận tương tác để cho phép phát tiếng
+                rain.play().then(() => { 
+                    rain.pause(); 
+                    this.state.unlocked = true; 
+                    console.log("Audio Unlocked!");
+                }).catch(()=>{});
             },
 
             speak(txt) {
@@ -100,13 +105,15 @@
                 window.speechSynthesis.speak(msg);
             },
 
+            // ĐÃ TỐI ƯU HÀM TOGGLE ĐỂ PHÁT NHẠC MƯA MƯỢT HƠN
             toggleRain() {
                 const rain = document.getElementById('rain-audio');
                 const btn = document.getElementById('rain-btn');
+                const volInput = document.querySelector('input[type="range"]');
                 
                 if (rain.paused) {
-                    rain.volume = document.querySelector('input[type="range"]').value;
-                    rain.play();
+                    rain.volume = volInput.value;
+                    rain.play().catch(e => console.error("Cần tương tác với web trước!"));
                     this.state.isRainy = true;
                     btn.classList.add('text-indigo-500');
                     btn.innerText = '⛈️';
@@ -226,7 +233,8 @@
                             ]);
                             const viMean = t?.[0]?.[0]?.[0]?.toLowerCase() || '';
                             const entry = i?.[0];
-                            let pos = entry?.meanings?.[0]?.partOfSpeech.toLowerCase() || '';
+                            const meanings = entry?.meanings || [];
+                            let pos = meanings[0]?.partOfSpeech.toLowerCase() || '';
                             let tag = pos.includes('noun')?' (n)':pos.includes('verb')?' (v)':pos.includes('adj')?' (adj)':pos.includes('adv')?' (adv)':'';
                             document.getElementById('in-vi').value = viMean + tag;
                             const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
