@@ -1,40 +1,289 @@
-ans(q) {
-    if(!this.state.flipped) return;
-    const item = this.state.queue[0];
-    const inp = document.getElementById('recall-input');
-    if (inp && !inp.disabled && q > 0) return; 
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KP v-PRO MAX | PERFORMANCE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
+        .tab-active { background: #1e293b !important; color: white !important; border-color: #1e293b !important; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 16px; width: 100%; transition: all 0.2s; }
+        .heat-map { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; }
+        .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
+        .hidden { display: none !important; }
+        .custom-scroll::-webkit-scrollbar { display: none; }
+        .input-focus:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
+    </style>
+</head>
+<body class="flex justify-center p-2 sm:p-4">
+    <div class="w-full max-w-lg flex flex-col h-[98dvh]">
+        <header class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                    <span class="font-black text-orange-500 text-lg">🔥 <span id="streak">0</span></span>
+                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">PERFORMANCE</span>
+                </div>
+                <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
+            </div>
+            <div id="heatmap" class="heat-map w-16 sm:w-20"></div>
+        </header>
 
-    let { reps, ef, interval: i } = item;
-    
-    // Thuật toán SM-2 tinh chỉnh
-    if (q >= 3) {
-        if (reps === 0) i = 1;
-        else if (reps === 1) i = 3; // Giảm từ 4 xuống 3 để ôn tập kỹ hơn lúc đầu
-        else i = Math.round(i * ef);
-        reps++;
-    } else {
-        reps = 0;
-        i = 1;
-    }
+        <main id="view" class="flex-grow overflow-hidden relative"></main>
 
-    // Cập nhật Ease Factor (Độ dễ của từ)
-    ef = ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
-    if (ef < 1.3) ef = 1.3;
+        <nav class="mt-2 grid grid-cols-4 gap-1.5">
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [A]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [S]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [D]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data [F]</button>
+        </nav>
+    </div>
 
-    // --- CHỖ CẢI TIẾN: Thêm Fuzz (Độ lệch ngẫu nhiên 5-10%) ---
-    // Giúp phân phối từ vựng đều các ngày, không bị dồn cục
-    let fuzz = 1;
-    if (i > 2) {
-        const deviation = 0.1; // 10%
-        fuzz = (1 - deviation) + (Math.random() * deviation * 2);
-    }
-    
-    const finalInterval = Math.max(1, Math.round(i * fuzz));
-    item.next = Date.now() + (finalInterval * 86400000);
-    
-    Object.assign(item, { reps, ef, interval: i }); // Lưu i gốc để tính cho lần sau
-    
-    const d = new Date().toDateString(); 
-    DB.meta.history[d] = (DB.meta.history[d]||0)+1;
-    this.updateStreak(); DB.save(); this.route('study');
-}
+    <script>
+        const DB = {
+            vocab: [],
+            meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
+            cache: new Map(), timer: null,
+            async init() {
+                return new Promise((resolve) => {
+                    const request = indexedDB.open("KP_PRO_MAX", 1);
+                    request.onupgradeneeded = (e) => { e.target.result.createObjectStore("store"); };
+                    request.onsuccess = async (e) => {
+                        this.idb = e.target.result;
+                        const store = this.idb.transaction("store", "readonly").objectStore("store");
+                        const v = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
+                        const m = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
+                        if (v) this.vocab = v; if (m) this.meta = m; resolve();
+                    };
+                });
+            },
+            async save() {
+                const tx = this.idb.transaction("store", "readwrite");
+                tx.objectStore("store").put(this.vocab, "vocab");
+                tx.objectStore("store").put(this.meta, "meta");
+                this.updateUI();
+            },
+            updateUI() {
+                document.getElementById('streak').innerText = this.meta.streak;
+                const active = this.vocab.filter(i => !i.trash);
+                const mastered = active.filter(i => i.ef > 3.2).length;
+                document.getElementById('mastery').innerText = `MASTERED: ${active.length ? Math.round(mastered/active.length*100) : 0}%`;
+                const h = document.getElementById('heatmap'); h.innerHTML = '';
+                const today = new Date();
+                for(let i=15; i>=0; i--) {
+                    const d = new Date(); d.setDate(today.getDate() - i);
+                    const count = this.meta.history[d.toDateString()] || 0;
+                    const cell = document.createElement('div');
+                    cell.className = 'heat-cell';
+                    if(count > 0) cell.style.background = `rgba(79, 70, 229, ${Math.min(0.2 + count * 0.15, 1)})`;
+                    h.appendChild(cell);
+                }
+            }
+        };
+
+        const Core = {
+            state: { view: '', flipped: false, queue: [], isTrashView: false },
+            speak(txt) {
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance(txt);
+                msg.lang = 'en-US'; msg.rate = DB.meta.speechRate || 0.9;
+                window.speechSynthesis.speak(msg);
+            },
+            route(v) {
+                this.state.view = v; this.state.flipped = false; this.state.isTrashView = false;
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+                const btn = document.getElementById('n-'+v); if(btn) btn.classList.add('tab-active');
+                const port = document.getElementById('view'); port.innerHTML = '';
+                if (v === 'study') this.renderStudy(port);
+                else if (v === 'nexus') this.renderNexus(port);
+                else if (v === 'vault') this.renderVault(port);
+                else if (v === 'data') this.renderData(port);
+            },
+            renderStudy(v) {
+                this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
+                if(!this.state.queue.length) {
+                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Xong hết rồi! Nghỉ ngơi đi Hero! 📐</div>`;
+                    return;
+                }
+                const item = this.state.queue[0];
+                const needsTyping = item.reps < 2; // Yêu cầu gõ nếu từ mới hoặc mới học lại
+
+                v.innerHTML = `
+                    <div class="h-full flex flex-col">
+                        <div class="relative cursor-pointer" onclick="Core.flip()">
+                            <div id="card-front" class="card-side shadow-sm p-6 text-center">
+                                <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2>
+                                ${needsTyping ? '<div class="mt-4 px-3 py-1 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full">ACTIVE RECALL MODE</div>' : ''}
+                            </div>
+                            <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
+                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2>
+                                <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
+                                ${needsTyping ? `
+                                    <input id="recall-input" autocomplete="off" placeholder="Gõ lại từ để xác nhận..." 
+                                    class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 bg-transparent outline-none text-center font-black uppercase text-indigo-600 focus:border-indigo-500">
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity">
+                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN [1]</button>
+                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD [2]</button>
+                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD [3]</button>
+                            <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button>
+                        </div>
+                    </div>`;
+                
+                if (needsTyping) {
+                    setTimeout(() => {
+                        const inp = document.getElementById('recall-input');
+                        if (inp) inp.addEventListener('input', (e) => {
+                            if (e.target.value.toLowerCase().trim() === item.en.toLowerCase().trim()) {
+                                e.target.classList.replace('text-indigo-600', 'text-green-500');
+                                e.target.disabled = true;
+                            }
+                        });
+                    }, 100);
+                }
+            },
+            flip() {
+                if (this.state.view !== 'study' || !this.state.queue.length) return;
+                this.state.flipped = !this.state.flipped;
+                document.getElementById('card-front').classList.toggle('hidden', this.state.flipped);
+                document.getElementById('card-back').classList.toggle('hidden', !this.state.flipped);
+                document.getElementById('study-controls')?.classList.remove('opacity-20', 'pointer-events-none');
+                if(this.state.flipped) {
+                    this.speak(this.state.queue[0].en);
+                    const inp = document.getElementById('recall-input');
+                    if (inp) inp.focus();
+                }
+            },
+            ans(q) {
+                if(!this.state.flipped) return;
+                const item = this.state.queue[0];
+                const inp = document.getElementById('recall-input');
+                if (inp && !inp.disabled && q > 0) return; // Bắt buộc gõ đúng nếu không chọn Again
+
+                let { reps, ef, interval: i } = item;
+                if (q >= 3) { if (reps === 0) i = 1; else if (reps === 1) i = 4; else i = Math.round(i * ef); reps++; }
+                else { reps = 0; i = 1; }
+                ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+                item.next = Date.now() + (i * 86400000);
+                Object.assign(item, { reps, ef, interval: i });
+                const d = new Date().toDateString(); DB.meta.history[d] = (DB.meta.history[d]||0)+1;
+                this.updateStreak(); DB.save(); this.route('study');
+            },
+            renderNexus(port) {
+                port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"><input id="in-en" autocomplete="off" placeholder="ENGLISH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"><input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"><div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div><button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU [ENTER]</button></div>`;
+                const en = document.getElementById('in-en'); en.focus();
+                en.oninput = () => {
+                    const val = en.value.trim().toLowerCase();
+                    if(val.length < 2) return;
+                    if(DB.cache.has(val)) { 
+                        const d = DB.cache.get(val); document.getElementById('in-vi').value = d.vi; 
+                        document.getElementById('nexus-info').innerText = 'IPA: ' + (d.ipa || 'N/A'); window.curInf = {ipa: d.ipa}; return; 
+                    }
+                    clearTimeout(DB.timer);
+                    DB.timer = setTimeout(async () => {
+                        try {
+                            const cId = 'gtx' + Math.floor(Math.random()*10000);
+                            const [t, i] = await Promise.all([
+                                fetch(`https://translate.googleapis.com/translate_a/single?client=${cId}&sl=en&tl=vi&dt=t&q=${encodeURIComponent(val)}`).then(r => r.json()),
+                                fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
+                            ]);
+                            let mean = t?.[0]?.[0]?.[0] || '';
+                            const ipa = i?.[0]?.phonetic || '';
+                            DB.cache.set(val, {vi: mean, ipa});
+                            document.getElementById('in-vi').value = mean;
+                            document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
+                            window.curInf = {ipa};
+                        } catch(e) {}
+                    }, 450);
+                };
+            },
+            add() {
+                const en = document.getElementById('in-en')?.value.trim();
+                const vi = document.getElementById('in-vi')?.value.trim();
+                if(!en || !vi) return;
+                DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now(), trash: false });
+                DB.save(); this.speak(en); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
+            },
+            renderVault(v) {
+                v.innerHTML = `<div class="flex gap-2 mb-2"><input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="flex-grow p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><button onclick="Core.toggleTrash()" id="trash-btn" class="px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]">THÙNG RÁC</button></div><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                this.search('');
+            },
+            toggleTrash() {
+                this.state.isTrashView = !this.state.isTrashView;
+                const btn = document.getElementById('trash-btn');
+                btn.innerText = this.state.isTrashView ? "QUAY LẠI" : "THÙNG RÁC";
+                btn.className = this.state.isTrashView ? "px-4 bg-orange-500 text-white rounded-xl font-black text-[10px]" : "px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]";
+                this.search(document.getElementById('v-search').value);
+            },
+            search(q) {
+                const list = document.getElementById('v-list'); list.innerHTML = '';
+                const query = q.toLowerCase().trim();
+                const source = DB.vocab.filter(i => {
+                    const m = i.en.toLowerCase().includes(query) || i.vi.includes(query);
+                    return this.state.isTrashView ? (i.trash && m) : (!i.trash && m);
+                });
+                source.slice(-40).reverse().forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm";
+                    if (this.state.isTrashView) {
+                        div.innerHTML = `<div class="text-sm font-black text-slate-400 uppercase">${item.en}</div><div class="flex gap-3"><button onclick="Core.restore(${item.id})" class="text-indigo-500 text-[9px] font-black uppercase">KHÔI PHỤC</button><button onclick="Core.kill(${item.id})" class="text-rose-600 text-[9px] font-black uppercase underline">XÓA HẲN</button></div>`;
+                    } else {
+                        div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase">${item.en} <span class="text-indigo-400 ml-1 font-bold">/ ${item.vi}</span></div><button onclick="Core.moveToTrash(${item.id})" class="text-slate-400 text-[9px] font-black uppercase">XÓA</button>`;
+                    }
+                    list.appendChild(div);
+                });
+            },
+            moveToTrash(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = true; DB.save(); this.search(document.getElementById('v-search').value); },
+            restore(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = false; DB.save(); this.search(document.getElementById('v-search').value); },
+            kill(id) { DB.vocab = DB.vocab.filter(x => x.id !== id); DB.save(); this.search(document.getElementById('v-search').value); },
+            renderData(v) {
+                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
+            },
+            updateStreak() {
+                const t = new Date().toDateString();
+                if(DB.meta.lastDate !== t) {
+                    const l = new Date(DB.meta.lastDate);
+                    DB.meta.streak = ((new Date() - l)/86400000 <= 1.5) ? DB.meta.streak + 1 : 1;
+                    DB.meta.lastDate = t;
+                }
+            },
+            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Performance.json'; a.click(); },
+            import(el) {
+                const r = new FileReader();
+                r.onload = async (e) => {
+                    const d = JSON.parse(e.target.result);
+                    const curMap = new Map();
+                    DB.vocab.forEach(v => curMap.set(v.en.toLowerCase().trim(), v));
+                    d.v.forEach(nv => {
+                        const k = nv.en.toLowerCase().trim();
+                        if(curMap.has(k)) { if(nv.reps > curMap.get(k).reps) Object.assign(curMap.get(k), nv); }
+                        else { DB.vocab.push(nv); }
+                    });
+                    DB.meta.streak = Math.max(DB.meta.streak, d.m.streak || 0);
+                    for (let date in d.m.history) { DB.meta.history[date] = (DB.meta.history[date] || 0) + d.m.history[date]; }
+                    await DB.save(); location.reload();
+                };
+                r.readAsText(el.files[0]);
+            }
+        };
+
+        window.onkeydown = (e) => {
+            const isIn = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+            const k = e.key.toLowerCase();
+            if (isIn && e.target.id !== 'recall-input') { if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); return; }
+            if (['a','s','d','f'].includes(k)) { 
+                e.preventDefault(); 
+                if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); 
+            }
+            if (Core.state.view === 'study' && Core.state.queue.length) {
+                if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
+                if(Core.state.flipped) { if(k==='1') Core.ans(0); if(k==='2') Core.ans(1); if(k==='3') Core.ans(3); if(k==='4') Core.ans(5); }
+            }
+        };
+
+        DB.init().then(() => { Core.route('study'); DB.updateUI(); });
+    </script>
+</body>
+</html>
