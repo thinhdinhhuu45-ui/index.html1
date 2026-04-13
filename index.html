@@ -13,7 +13,6 @@
         .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
         .hidden { display: none !important; }
         .custom-scroll::-webkit-scrollbar { display: none; }
-        .input-focus:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
     </style>
 </head>
 <body class="flex justify-center p-2 sm:p-4">
@@ -40,7 +39,6 @@
     </div>
 
     <script>
-        // FSRS v5 Weights
         const W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
 
         const DB = {
@@ -71,7 +69,8 @@
                 const active = this.vocab.filter(i => !i.trash);
                 const maxS = active.length ? Math.max(...active.map(i => i.s || 0)) : 0;
                 document.getElementById('mastery').innerText = `STABILITY MAX: ${Math.round(maxS)} DAYS`;
-                const h = document.getElementById('heatmap'); h.innerHTML = '';
+                const h = document.getElementById('heatmap'); if(!h) return;
+                h.innerHTML = '';
                 const today = new Date();
                 for(let i=15; i>=0; i--) {
                     const d = new Date(); d.setDate(today.getDate() - i);
@@ -121,13 +120,13 @@
                             <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
                                 <h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2>
                                 <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
-                                ${needsTyping ? `<input id="recall-input" autocomplete="off" placeholder="Gõ lại từ để xác nhận..." class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 bg-transparent outline-none text-center font-black uppercase text-indigo-600 focus:border-indigo-500">` : ''}
+                                ${needsTyping ? `<input id="recall-input" autocomplete="off" placeholder="Gõ lại từ..." class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 bg-transparent outline-none text-center font-black uppercase text-indigo-600">` : ''}
                             </div>
                         </div>
                         <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity">
-                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN [1]</button>
-                            <button onclick="Core.ans(2)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD [2]</button>
-                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD [3]</button>
+                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">AGAIN [1]</button>
+                            <button onclick="Core.ans(2)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">HARD [2]</button>
+                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl text-slate-400">GOOD [3]</button>
                             <button onclick="Core.ans(4)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button>
                         </div>
                     </div>`;
@@ -135,24 +134,24 @@
                 if (needsTyping) {
                     setTimeout(() => {
                         const inp = document.getElementById('recall-input');
-                        if (inp) inp.addEventListener('input', (e) => {
+                        if (inp) inp.oninput = (e) => {
                             if (e.target.value.toLowerCase().trim() === item.en.toLowerCase().trim()) {
-                                e.target.classList.replace('text-indigo-600', 'text-green-500');
+                                e.target.classList.add('text-green-500');
                                 e.target.disabled = true;
                             }
-                        });
+                        };
                     }, 100);
                 }
             },
             flip() {
                 if (this.state.view !== 'study' || !this.state.queue.length) return;
                 this.state.flipped = !this.state.flipped;
-                document.getElementById('card-front').classList.toggle('hidden', this.state.flipped);
-                document.getElementById('card-back').classList.toggle('hidden', !this.state.flipped);
+                document.getElementById('card-front')?.classList.toggle('hidden', this.state.flipped);
+                document.getElementById('card-back')?.classList.toggle('hidden', !this.state.flipped);
                 document.getElementById('study-controls')?.classList.remove('opacity-20', 'pointer-events-none');
                 if(this.state.flipped) { this.speak(this.state.queue[0].en); const inp = document.getElementById('recall-input'); if (inp) inp.focus(); }
             },
-            ans(g) { // g: 1-Again, 2-Hard, 3-Good, 4-Easy
+            ans(g) {
                 if(!this.state.flipped) return;
                 const item = this.state.queue[0];
                 const inp = document.getElementById('recall-input');
@@ -188,7 +187,22 @@
                 this.updateStreak(); DB.save(); this.route('study');
             },
             renderNexus(port) {
-                port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"><input id="in-en" autocomplete="off" placeholder="ENGLISH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"><input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"><div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div><button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU [ENTER]</button></div>`;
+                port.innerHTML = `
+                <div class="h-full flex flex-col gap-3">
+                    <div class="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-3">
+                        <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-3 border-2 border-slate-50 rounded-xl outline-none focus:border-indigo-500 font-black text-xl uppercase tracking-tighter">
+                        <input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-3 border-2 border-slate-50 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-md">
+                        <button onclick="Core.add()" class="bg-slate-900 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest active:scale-95">LƯU ĐƠN [ENTER]</button>
+                    </div>
+                    
+                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex-grow flex flex-col">
+                        <label class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 block">NHẬP NHANH (MỖI DÒNG 1 TỪ - ANH:VIỆT)</label>
+                        <textarea id="in-batch" placeholder="hi:chào&#10;hello:xin chào" class="flex-grow w-full p-4 bg-white/50 border-2 border-white rounded-xl outline-none focus:border-indigo-400 font-bold text-sm custom-scroll"></textarea>
+                        <button onclick="Core.batchAdd()" class="mt-2 bg-indigo-600 text-white py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md active:scale-95">LƯU TẤT CẢ [ENTER TRÊN Ô]</button>
+                    </div>
+                    <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic text-center">Tự động tra cứu khi nhập ô đơn...</div>
+                </div>`;
+                
                 const en = document.getElementById('in-en'); en.focus();
                 en.oninput = () => {
                     const val = en.value.trim().toLowerCase();
@@ -222,6 +236,31 @@
                 DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, s: 0, d: 0, laps: 0, interval: 0, next: Date.now(), trash: false });
                 DB.save(); this.speak(en); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
             },
+            batchAdd() {
+                const area = document.getElementById('in-batch');
+                const lines = area.value.split('\n');
+                let count = 0;
+                lines.forEach(line => {
+                    if (line.includes(':')) {
+                        const [en, vi] = line.split(':');
+                        if (en.trim() && vi.trim()) {
+                            DB.vocab.push({ 
+                                id: Date.now() + Math.random(), 
+                                en: en.trim(), 
+                                vi: vi.trim(), 
+                                ipa: '', reps: 0, s: 0, d: 0, laps: 0, interval: 0, 
+                                next: Date.now(), trash: false 
+                            });
+                            count++;
+                        }
+                    }
+                });
+                if (count > 0) {
+                    DB.save();
+                    area.value = '';
+                    alert(`Đã nạp thành công ${count} từ!`);
+                }
+            },
             renderVault(v) {
                 v.innerHTML = `<div class="flex gap-2 mb-2"><input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="flex-grow p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><button onclick="Core.toggleTrash()" id="trash-btn" class="px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]">THÙNG RÁC</button></div><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
@@ -234,7 +273,8 @@
                 this.search(document.getElementById('v-search').value);
             },
             search(q) {
-                const list = document.getElementById('v-list'); list.innerHTML = '';
+                const list = document.getElementById('v-list'); if(!list) return;
+                list.innerHTML = '';
                 const query = q.toLowerCase().trim();
                 const source = DB.vocab.filter(i => {
                     const m = i.en.toLowerCase().includes(query) || i.vi.includes(query);
@@ -278,16 +318,38 @@
         };
 
         window.onkeydown = (e) => {
-            const isIn = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
             const k = e.key.toLowerCase();
-            if (isIn && e.target.id !== 'recall-input') { if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); return; }
-            if (['a','s','d','f'].includes(k)) { 
+            const focused = document.activeElement;
+            
+            // Xử lý riêng cho ô nhập batch
+            if (focused.id === 'in-batch') {
+                if (e.key === 'Enter' && !e.shiftKey) { 
+                    e.preventDefault(); 
+                    Core.batchAdd(); 
+                }
+                return;
+            }
+
+            // Phím tắt điều hướng (chỉ khi không trong input)
+            const isInInput = ['INPUT', 'TEXTAREA'].includes(focused.tagName);
+            if (!isInInput && ['a','s','d','f'].includes(k)) { 
                 e.preventDefault(); 
                 if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); 
+                return;
             }
+
+            // Xử lý trong Nexus khi gõ Enter ô đơn
+            if (focused.id === 'in-en' || focused.id === 'in-vi') {
+                if (e.key === 'Enter') Core.add();
+                return;
+            }
+
+            // Xử lý trong Study
             if (Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
-                if(Core.state.flipped) { if(k==='1') Core.ans(1); if(k==='2') Core.ans(2); if(k==='3') Core.ans(3); if(k==='4') Core.ans(4); }
+                if(Core.state.flipped) {
+                    if(k==='1') Core.ans(1); if(k==='2') Core.ans(2); if(k==='3') Core.ans(3); if(k==='4') Core.ans(4);
+                }
             }
         };
 
