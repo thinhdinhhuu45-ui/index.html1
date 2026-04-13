@@ -14,7 +14,6 @@
         * { transition: none !important; } 
         .hidden { display: none !important; }
         .custom-scroll::-webkit-scrollbar { display: none; }
-        /* Hiệu ứng nhấp nháy cho Legend */
         @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .rank-legend { background: #f59e0b; color: white; animation: pulse-gold 2s infinite; }
     </style>
@@ -52,7 +51,8 @@
     </div>
 
     <audio id="rain-audio" loop>
-        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg"> </audio>
+        <source src="https://actions.google.com/sounds/v1/water/rain_on_roof.ogg" type="audio/mpeg">
+    </audio>
 
     <script>
         const DB = {
@@ -100,8 +100,6 @@
                 const btn = document.getElementById('rain-btn');
                 this.state.isRainy = !this.state.isRainy;
                 if(this.state.isRainy) {
-                    // Sử dụng link tiếng mưa từ tài nguyên web ổn định
-                    rain.src = "https://actions.google.com/sounds/v1/water/rain_on_roof.ogg";
                     rain.play();
                     btn.classList.add('text-indigo-500');
                     btn.innerText = '🌧️✨';
@@ -124,12 +122,10 @@
                 const count = DB.vocab.length;
                 const tag = document.getElementById('rank-tag');
                 let rank = { name: 'NEWBIE', class: 'bg-slate-100 text-slate-500' };
-                
                 if (count > 1000) rank = { name: 'LEGEND', class: 'rank-legend' };
                 else if (count > 500) rank = { name: 'SCHOLAR', class: 'bg-indigo-600 text-white' };
                 else if (count > 100) rank = { name: 'SURVIVOR', class: 'bg-orange-500 text-white' };
                 else if (count > 20) rank = { name: 'TRAINEE', class: 'bg-emerald-500 text-white' };
-
                 tag.innerText = rank.name;
                 tag.className = `text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm ${rank.class}`;
             },
@@ -199,8 +195,11 @@
                 ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
                 const delay = (q === 0) ? 600000 : (i * (0.95 + Math.random() * 0.1)) * 86400000;
                 Object.assign(item, { reps, ef, interval: i, next: Date.now() + delay });
+                
+                // Track history
                 const today = new Date().toDateString();
                 DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
+                
                 this.updateStreak(); this.route('study');
             },
 
@@ -223,6 +222,7 @@
                     const val = en.value.trim();
                     if(val.length > 1) {
                         try {
+                            document.getElementById('nexus-info').innerText = 'TRA CỨU...';
                             const [t, i] = await Promise.all([
                                 fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
                                 fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
@@ -234,13 +234,14 @@
                                 const pos = entry.meanings[0].partOfSpeech.toLowerCase();
                                 if (pos.includes('noun')) posTag = ' (n)';
                                 else if (pos.includes('verb')) posTag = ' (v)';
-                                else if (pos.includes('adjective')) posTag = ' (adj)';
-                                else if (pos.includes('adverb')) posTag = ' (adv)';
+                                else if (pos.includes('adj')) posTag = ' (adj)';
+                                else if (pos.includes('adv')) posTag = ' (adv)';
                             }
                             document.getElementById('in-vi').value = viMean + posTag;
-                            window.curInf = { ipa: entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '' };
-                            document.getElementById('nexus-info').innerText = 'IPA: ' + (window.curInf.ipa || '...');
-                        } catch(e) {}
+                            const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
+                            window.curInf = { ipa: ipa };
+                            document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
+                        } catch(e) { document.getElementById('nexus-info').innerText = 'IPA: N/A'; }
                     }
                 };
             },
@@ -250,6 +251,11 @@
                 const vi = document.getElementById('in-vi')?.value.trim();
                 if(!en || !vi) return;
                 DB.vocab.push({ id: Date.now(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
+                
+                // Track activity in heatmap immediately
+                const today = new Date().toDateString();
+                DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
+                
                 this.speak(en);
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = '';
                 document.getElementById('in-en').focus(); DB.save(); DB.updateUI(); this.updateRank();
@@ -261,11 +267,13 @@
                 if(!val) return;
                 const lines = val.split('\n');
                 let count = 0;
+                const today = new Date().toDateString();
                 lines.forEach(line => {
                     if (line.includes(':')) {
                         const [en, vi] = line.split(':').map(s => s.trim());
                         if (en && vi) {
                             DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
+                            DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
                             count++;
                         }
                     }
