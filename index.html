@@ -33,21 +33,20 @@
         <main id="view" class="flex-grow overflow-hidden relative"></main>
 
         <nav class="mt-2 grid grid-cols-4 gap-1.5">
-            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [S]</button>
-            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [N]</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [V]</button>
-            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data</button>
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [A]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [S]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [D]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data [F]</button>
         </nav>
     </div>
 
     <script>
-        // --- GIỮ NGUYÊN HỆ THỐNG DB ---
         const DB = {
             vocab: [],
             meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
             index: new Map(),
-            cache: new Map(), // Lớp bảo vệ 1: Cache (Dịch rồi không dịch lại)
-            timer: null,      // Lớp bảo vệ 2: Debounce (Gõ xong mới dịch)
+            cache: new Map(),
+            timer: null,
             
             async init() {
                 return new Promise((resolve) => {
@@ -187,7 +186,6 @@
                 this.updateStreak(); DB.save(); this.route('study');
             },
 
-            // --- NEXUS ĐÃ ĐƯỢC NÂNG CẤP "GIÁP" ---
             renderNexus(port) {
                 port.innerHTML = ` <div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"> <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"> <input id="in-vi" autocomplete="off" placeholder="NGHĨA CỦA TỪ..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"> <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div> <button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU VÀO KHO [ENTER]</button> </div> <div class="mt-2 flex flex-col gap-2"> <textarea id="bulk" class="w-full h-32 p-4 outline-none text-xs font-mono bg-white border border-slate-100 rounded-2xl custom-scroll" placeholder="NHẬP NHANH (từ : nghĩa)"></textarea> <button onclick="Core.bulkAdd()" class="w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">📥 NHẬP DANH SÁCH</button> </div>`;
                 const en = document.getElementById('in-en'); en.focus();
@@ -195,8 +193,6 @@
                 en.oninput = () => {
                     const val = en.value.trim().toLowerCase();
                     if(val.length < 2) return;
-
-                    // 1. Kiểm tra Cache trước (Tốc độ ánh sáng, 0 request)
                     if (DB.cache.has(val)) {
                         const data = DB.cache.get(val);
                         document.getElementById('in-vi').value = data.vi;
@@ -204,8 +200,6 @@
                         window.curInf = { ipa: data.ipa };
                         return;
                     }
-
-                    // 2. Debounce: Đợi ngừng gõ 300ms mới fetch (Chống ban)
                     clearTimeout(DB.timer);
                     DB.timer = setTimeout(async () => {
                         try {
@@ -218,10 +212,7 @@
                             let pos = entry?.meanings[0]?.partOfSpeech.toLowerCase() || '';
                             let tag = pos.includes('noun')?' (n)':pos.includes('verb')?' (v)':pos.includes('adj')?' (adj)':pos.includes('adv')?' (adv)':'';
                             const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
-                            
-                            // Lưu vào cache
                             DB.cache.set(val, { vi: viMean + tag, ipa });
-
                             document.getElementById('in-vi').value = viMean + tag;
                             document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
                             window.curInf = { ipa };
@@ -307,13 +298,39 @@
             import(el) { const r = new FileReader(); r.onload = async (e) => { const d = JSON.parse(e.target.result); DB.vocab = d.v; DB.meta = d.m; await DB.save(); location.reload(); }; r.readAsText(el.files[0]); }
         };
 
+        // --- HỆ THỐNG PHÍM TẮT ĐÃ ĐƯỢC FIX CỰC ĐOAN ---
         window.onkeydown = (e) => {
             const k = e.key.toLowerCase();
-            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) { if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); return; }
-            if (k === 's') Core.route('study'); if (k === 'n') Core.route('nexus'); if (k === 'v') Core.route('vault');
+            const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+
+            // Xử lý phím tắt chuyển tab A S D F (Ngay cả khi đang focus vào input)
+            if (['a', 's', 'd', 'f'].includes(k)) {
+                // Nếu đang ở ô nhập, nhưng nhấn phím chuyển tab khác mục hiện tại -> Cho phép nhảy
+                // Ví dụ: Đang ở Nexus (S) và focus input, nhấn A -> Nhảy sang Study
+                const currentMap = { 'study':'a', 'nexus':'s', 'vault':'d', 'data':'f' };
+                if (k !== currentMap[Core.state.view]) {
+                    e.preventDefault(); 
+                    if(isInput) e.target.blur(); // Thoát khỏi ô nhập để không bị dính chữ
+                    if (k === 'a') Core.route('study');
+                    if (k === 's') Core.route('nexus');
+                    if (k === 'd') Core.route('vault');
+                    if (k === 'f') Core.route('data');
+                    return;
+                }
+            }
+
+            // Nếu đang trong Input và không phải phím chuyển tab -> Chỉ xử lý Enter để Add
+            if (isInput) { 
+                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); 
+                return; 
+            }
+
+            // Logic phím tắt khi học (Study Mode)
             if (Core.state.view === 'study' && Core.state.queue.length > 0) {
-                if (e.code === 'Space' || k === 'f') { e.preventDefault(); Core.flip(); }
-                if (Core.state.flipped) { if (k === '1') Core.ans(0); if (k === '2') Core.ans(1); if (k === '3') Core.ans(3); if (k === '4') Core.ans(5); }
+                if (e.code === 'Space') { e.preventDefault(); Core.flip(); }
+                if (Core.state.flipped) { 
+                    if (k === '1') Core.ans(0); if (k === '2') Core.ans(1); if (k === '3') Core.ans(3); if (k === '4') Core.ans(5); 
+                }
             }
         };
 
