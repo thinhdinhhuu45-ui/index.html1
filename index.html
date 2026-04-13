@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KP v-PRO | THE FINAL GATE</title>
+    <title>KP v-PRO | RAIN ONLY EDITION</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
         .tab-active { background: #1e293b !important; color: white !important; border-color: #1e293b !important; }
-        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 16px; width: 100%; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 16px; width: 100%; transition: all 0.2s; }
         .heat-map { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; }
-        .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; transition: background 0.3s; }
-        * { transition: none !important; } 
+        .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
         .hidden { display: none !important; }
-        .custom-scroll { scrollbar-width: none; }
         .custom-scroll::-webkit-scrollbar { display: none; }
         @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .rank-legend { background: #f59e0b; color: white; animation: pulse-gold 2s infinite; }
     </style>
 </head>
-<body class="flex justify-center p-2 sm:p-4">
+<body class="flex justify-center p-2 sm:p-4" onclick="Core.unlockAudio()">
 
     <div class="w-full max-w-lg flex flex-col h-[98dvh]">
         <header class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
@@ -31,28 +29,24 @@
                 <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
             </div>
             
-            <div class="flex items-center gap-2">
-                <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 gap-2">
-                    <button onclick="Core.toggleRain()" id="rain-btn" class="text-slate-300 hover:text-indigo-500 text-lg transition-all">🌧️</button>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-2 py-1.5 gap-2">
+                    <button onclick="Core.toggleRain()" id="rain-btn" class="text-slate-300 hover:text-indigo-500 text-xl transition-all">🌧️</button>
                     <input type="range" min="0" max="1" step="0.05" value="0.7" 
-                           class="w-12 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                           class="w-10 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                            oninput="document.getElementById('rain-audio').volume = this.value">
                 </div>
-                <div id="heatmap" class="heat-map w-20"></div>
-            </div>
-
-            <div class="text-[10px] font-mono text-slate-400 font-bold text-right leading-tight" id="stats-total">
-                0 UNITS
+                <div id="heatmap" class="heat-map w-16 sm:w-20"></div>
             </div>
         </header>
 
         <main id="view" class="flex-grow overflow-hidden relative"></main>
 
         <nav class="mt-2 grid grid-cols-4 gap-1.5">
-            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Study [S]</button>
-            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Nexus [N]</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Vault [V]</button>
-            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase shadow-sm active:bg-slate-50">Data</button>
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [S]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [N]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [V]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data</button>
         </nav>
     </div>
 
@@ -71,7 +65,6 @@
             },
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
-                document.getElementById('stats-total').innerText = this.vocab.length + " UNITS";
                 const mastered = this.vocab.filter(i => i.ef > 3.2).length;
                 document.getElementById('mastery').innerText = `MASTERED: ${this.vocab.length ? Math.round(mastered/this.vocab.length*100) : 0}%`;
                 this.renderHeatmap();
@@ -79,7 +72,7 @@
             renderHeatmap() {
                 const h = document.getElementById('heatmap'); h.innerHTML = '';
                 const today = new Date();
-                for(let i=20; i>=0; i--) {
+                for(let i=15; i>=0; i--) {
                     const d = new Date(); d.setDate(today.getDate() - i);
                     const count = this.meta.history[d.toDateString()] || 0;
                     const cell = document.createElement('div');
@@ -91,8 +84,14 @@
         };
 
         const Core = {
-            state: { view: '', flipped: false, queue: [], isRainy: false },
+            state: { view: '', flipped: false, queue: [], isRainy: false, unlocked: false },
             
+            unlockAudio() {
+                if(this.state.unlocked) return;
+                const rain = document.getElementById('rain-audio');
+                rain.play().then(() => { rain.pause(); this.state.unlocked = true; }).catch(()=>{});
+            },
+
             speak(txt) {
                 window.speechSynthesis.cancel();
                 const msg = new SpeechSynthesisUtterance(txt);
@@ -106,8 +105,8 @@
                 const btn = document.getElementById('rain-btn');
                 
                 if (rain.paused) {
-                    rain.volume = document.querySelector('input[type="range"]')?.value || 0.7;
-                    rain.play().catch(() => alert("Click vào màn hình một phát rồi bật lại nhé!"));
+                    rain.volume = document.querySelector('input[type="range"]').value;
+                    rain.play();
                     this.state.isRainy = true;
                     btn.classList.add('text-indigo-500');
                     btn.innerText = '⛈️';
@@ -121,9 +120,7 @@
 
             getPosTag(vi) {
                 const map = { '(n)': 'bg-blue-100 text-blue-600', '(v)': 'bg-green-100 text-green-600', '(adj)': 'bg-orange-100 text-orange-600', '(adv)': 'bg-purple-100 text-purple-600' };
-                for (let key in map) {
-                    if (vi.toLowerCase().includes(key)) return `<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${map[key]}">${key.replace('(','').replace(')','')}</span>`;
-                }
+                for (let key in map) if (vi.toLowerCase().includes(key)) return `<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${map[key]}">${key.replace('(','').replace(')','')}</span>`;
                 return '';
             },
 
@@ -145,9 +142,9 @@
                 const btn = document.getElementById('n-'+v); if(btn) btn.classList.add('tab-active');
                 const port = document.getElementById('view'); port.innerHTML = '';
                 if (v === 'study') this.renderStudy(port);
-                if (v === 'nexus') this.renderNexus(port);
-                if (v === 'vault') this.renderVault(port);
-                if (v === 'data') this.renderData(port);
+                else if (v === 'nexus') this.renderNexus(port);
+                else if (v === 'vault') this.renderVault(port);
+                else if (v === 'data') this.renderData(port);
                 this.updateRank();
                 DB.save();
             },
@@ -155,7 +152,7 @@
             renderStudy(v) {
                 this.state.queue = DB.vocab.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
                 if(this.state.queue.length === 0) {
-                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Hết bài rồi! Học Toán tiếp thôi Hero! 📐</div>`;
+                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Xong hết rồi! Học Toán tiếp đi Hero! 📐</div>`;
                     return;
                 }
                 const item = this.state.queue[0];
@@ -167,29 +164,26 @@
                             </div>
                             <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
                                 <div class="mb-2">${this.getPosTag(item.vi)}</div>
-                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight px-4 leading-tight">
-                                    ${item.vi.replace(/\(n\)|\(v\)|\(adj\)|\(adv\)/gi, '').trim()}
-                                </h2>
+                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi.replace(/\(n\)|\(v\)|\(adj\)|\(adv\)/gi, '').trim()}</h2>
                                 <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
                             </div>
                         </div>
-                        <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none">
-                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl hover:bg-rose-50 transition-colors">AGAIN</button>
+                        <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity">
+                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl hover:bg-rose-50">AGAIN</button>
                             <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD</button>
                             <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD</button>
-                            <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg shadow-indigo-100">EASY</button>
+                            <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY</button>
                         </div>
                     </div>`;
             },
 
             flip() {
-                if (this.state.view !== 'study' || this.state.queue.length === 0) return;
+                if (this.state.view !== 'study' || !this.state.queue.length) return;
                 this.state.flipped = !this.state.flipped;
                 document.getElementById('card-front').classList.toggle('hidden', this.state.flipped);
                 document.getElementById('card-back').classList.toggle('hidden', !this.state.flipped);
                 const ctrl = document.getElementById('study-controls');
-                ctrl.classList.toggle('opacity-20', !this.state.flipped);
-                ctrl.classList.toggle('pointer-events-none', !this.state.flipped);
+                ctrl.classList.remove('opacity-20', 'pointer-events-none');
                 if(this.state.flipped) this.speak(this.state.queue[0].en);
             },
 
@@ -204,10 +198,8 @@
                 ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
                 const delay = (q === 0) ? 600000 : (i * (0.95 + Math.random() * 0.1)) * 86400000;
                 Object.assign(item, { reps, ef, interval: i, next: Date.now() + delay });
-                
                 const today = new Date().toDateString();
                 DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
-                
                 this.updateStreak(); this.route('study');
             },
 
@@ -216,40 +208,31 @@
                     <div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4">
                         <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter">
                         <input id="in-vi" autocomplete="off" placeholder="NGHĨA CỦA TỪ..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg">
-                        <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động lấy IPA...</div>
-                        <button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95">LƯU VÀO KHO [ENTER]</button>
+                        <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div>
+                        <button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU VÀO KHO [ENTER]</button>
                     </div>
                     <div class="mt-2 flex flex-col gap-2">
                         <textarea id="bulk" class="w-full h-32 p-4 outline-none text-xs font-mono bg-white border border-slate-100 rounded-2xl custom-scroll" placeholder="NHẬP NHANH (từ : nghĩa)"></textarea>
-                        <button onclick="Core.bulkAdd()" class="w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-[0.2em]">📥 NHẬP DANH SÁCH NHANH</button>
+                        <button onclick="Core.bulkAdd()" class="w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">📥 NHẬP DANH SÁCH</button>
                     </div>`;
-                
-                const en = document.getElementById('in-en');
-                en.focus();
+                const en = document.getElementById('in-en'); en.focus();
                 en.oninput = async () => {
                     const val = en.value.trim();
                     if(val.length > 1) {
                         try {
-                            document.getElementById('nexus-info').innerText = 'TRA CỨU...';
                             const [t, i] = await Promise.all([
                                 fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
                                 fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
                             ]);
-                            const entry = i?.[0];
                             const viMean = t?.[0]?.[0]?.[0]?.toLowerCase() || '';
-                            let posTag = '';
-                            if (entry?.meanings?.[0]) {
-                                const pos = entry.meanings[0].partOfSpeech.toLowerCase();
-                                if (pos.includes('noun')) posTag = ' (n)';
-                                else if (pos.includes('verb')) posTag = ' (v)';
-                                else if (pos.includes('adj')) posTag = ' (adj)';
-                                else if (pos.includes('adv')) posTag = ' (adv)';
-                            }
-                            document.getElementById('in-vi').value = viMean + posTag;
+                            const entry = i?.[0];
+                            let pos = entry?.meanings?.[0]?.partOfSpeech.toLowerCase() || '';
+                            let tag = pos.includes('noun')?' (n)':pos.includes('verb')?' (v)':pos.includes('adj')?' (adj)':pos.includes('adv')?' (adv)':'';
+                            document.getElementById('in-vi').value = viMean + tag;
                             const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
-                            window.curInf = { ipa: ipa };
+                            window.curInf = { ipa };
                             document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
-                        } catch(e) { document.getElementById('nexus-info').innerText = 'IPA: N/A'; }
+                        } catch(e) {}
                     }
                 };
             },
@@ -263,31 +246,28 @@
                 DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
                 this.speak(en);
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = '';
-                document.getElementById('in-en').focus(); DB.save(); DB.updateUI(); this.updateRank();
+                document.getElementById('in-en').focus(); DB.save();
             },
 
             bulkAdd() {
                 const area = document.getElementById('bulk');
                 const val = area?.value.trim();
                 if(!val) return;
-                const lines = val.split('\n');
-                let count = 0;
                 const today = new Date().toDateString();
-                lines.forEach(line => {
+                val.split('\n').forEach(line => {
                     if (line.includes(':')) {
                         const [en, vi] = line.split(':').map(s => s.trim());
                         if (en && vi) {
                             DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
                             DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
-                            count++;
                         }
                     }
                 });
-                if (count > 0) { area.value = ''; DB.save(); DB.updateUI(); this.updateRank(); }
+                area.value = ''; DB.save();
             },
 
             renderVault(v) {
-                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM TRONG KHO..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
             },
 
@@ -302,33 +282,23 @@
             },
 
             del(id) {
-                const backup = [...DB.vocab];
-                const item = DB.vocab.find(i => i.id === id);
                 DB.vocab = DB.vocab.filter(i => i.id !== id);
                 DB.save(); this.search(document.getElementById('v-search')?.value || '');
-                const toast = document.createElement('div');
-                toast.className = "fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full text-[9px] font-black z-50 flex gap-4 shadow-2xl";
-                toast.innerHTML = `ĐÃ XÓA: ${item.en.toUpperCase()} <button id="undo-btn" class="text-indigo-400 underline uppercase">Hoàn tác</button>`;
-                document.body.appendChild(toast);
-                const timer = setTimeout(() => toast.remove(), 3000);
-                document.getElementById('undo-btn').onclick = () => { clearTimeout(timer); DB.vocab = backup; DB.save(); this.search(''); toast.remove(); this.updateRank(); };
             },
 
             renderData(v) {
                 v.innerHTML = `
                 <div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100">
                     <div class="p-4 bg-slate-50 rounded-xl">
-                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-3 text-center">Tốc độ giọng nói: <span id="rate-val" class="text-indigo-600">${DB.meta.speechRate || 0.9}</span>X</label>
-                        <input type="range" min="0.3" max="1.5" step="0.1" value="${DB.meta.speechRate || 0.9}" 
-                            class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                            oninput="DB.meta.speechRate = parseFloat(this.value); document.getElementById('rate-val').innerText = this.value; DB.save();">
+                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ: <span id="rate-val" class="text-indigo-600">${DB.meta.speechRate || 0.9}</span>X</label>
+                        <input type="range" min="0.3" max="1.5" step="0.1" value="${DB.meta.speechRate || 0.9}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate = parseFloat(this.value); document.getElementById('rate-val').innerText = this.value; DB.save();">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase border border-indigo-100">Xuất file</button>
-                        <button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase border border-slate-100">Nhập file</button>
+                        <button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button>
+                        <button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button>
                     </div>
                     <input type="file" id="imp" onchange="Core.import(this)" class="hidden">
-                    <button onclick="if(confirm('Xóa sạch bộ nhớ?')){localStorage.clear();location.reload()}" class="mt-4 text-rose-300 text-[9px] font-black uppercase tracking-widest">Format bộ nhớ</button>
+                    <button onclick="if(confirm('Xóa sạch?')){localStorage.clear();location.reload()}" class="mt-4 text-rose-300 text-[9px] font-black uppercase">Format bộ nhớ</button>
                 </div>`;
             },
 
@@ -354,23 +324,19 @@
         };
 
         window.onkeydown = (e) => {
-            const target = e.target;
-            if (['INPUT', 'TEXTAREA'].includes(target.tagName)) {
-                if (e.key === 'Enter') {
-                    if (target.id === 'in-en') Core.add();
-                    if (target.id === 'bulk' && !e.shiftKey) { e.preventDefault(); Core.bulkAdd(); }
-                }
+            const k = e.key.toLowerCase();
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
                 return;
             }
-            const key = e.key.toLowerCase();
-            if (key === 's') Core.route('study');
-            if (key === 'n') Core.route('nexus');
-            if (key === 'v') Core.route('vault');
+            if (k === 's') Core.route('study');
+            if (k === 'n') Core.route('nexus');
+            if (k === 'v') Core.route('vault');
             if (Core.state.view === 'study' && Core.state.queue.length > 0) {
-                if (e.code === 'Space' || key === 'f') { e.preventDefault(); Core.flip(); }
+                if (e.code === 'Space' || k === 'f') { e.preventDefault(); Core.flip(); }
                 if (Core.state.flipped) {
-                    if (key === '1') Core.ans(0); if (key === '2') Core.ans(1);
-                    if (key === '3') Core.ans(3); if (key === '4') Core.ans(5);
+                    if (k === '1') Core.ans(0); if (k === '2') Core.ans(1);
+                    if (k === '3') Core.ans(3); if (k === '4') Core.ans(5);
                 }
             }
         };
