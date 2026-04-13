@@ -13,6 +13,7 @@
         .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; transition: background 0.3s; }
         * { transition: none !important; } 
         .hidden { display: none !important; }
+        .custom-scroll { scrollbar-width: none; }
         .custom-scroll::-webkit-scrollbar { display: none; }
         @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
         .rank-legend { background: #f59e0b; color: white; animation: pulse-gold 2s infinite; }
@@ -30,9 +31,14 @@
                 <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
             </div>
             
-            <div class="flex items-center gap-4">
-                <button onclick="Core.toggleRain()" id="rain-btn" class="text-slate-300 hover:text-indigo-400 transition-colors text-lg">🌧️</button>
-                <div id="heatmap" class="heat-map w-24"></div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 gap-2">
+                    <button onclick="Core.toggleRain()" id="rain-btn" class="text-slate-300 hover:text-indigo-500 text-lg transition-all">🌧️</button>
+                    <input type="range" min="0" max="1" step="0.05" value="0.7" 
+                           class="w-12 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                           oninput="document.getElementById('rain-audio').volume = this.value">
+                </div>
+                <div id="heatmap" class="heat-map w-20"></div>
             </div>
 
             <div class="text-[10px] font-mono text-slate-400 font-bold text-right leading-tight" id="stats-total">
@@ -43,10 +49,10 @@
         <main id="view" class="flex-grow overflow-hidden relative"></main>
 
         <nav class="mt-2 grid grid-cols-4 gap-1.5">
-            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Study [S]</button>
-            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Nexus [N]</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight">Vault [V]</button>
-            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase">Data</button>
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Study [S]</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Nexus [N]</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-500 text-xs uppercase tracking-tight shadow-sm active:bg-slate-50">Vault [V]</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-bold text-slate-400 text-[10px] uppercase shadow-sm active:bg-slate-50">Data</button>
         </nav>
     </div>
 
@@ -73,7 +79,7 @@
             renderHeatmap() {
                 const h = document.getElementById('heatmap'); h.innerHTML = '';
                 const today = new Date();
-                for(let i=15; i>=0; i--) {
+                for(let i=20; i>=0; i--) {
                     const d = new Date(); d.setDate(today.getDate() - i);
                     const count = this.meta.history[d.toDateString()] || 0;
                     const cell = document.createElement('div');
@@ -98,13 +104,16 @@
             toggleRain() {
                 const rain = document.getElementById('rain-audio');
                 const btn = document.getElementById('rain-btn');
-                this.state.isRainy = !this.state.isRainy;
-                if(this.state.isRainy) {
-                    rain.play();
+                
+                if (rain.paused) {
+                    rain.volume = document.querySelector('input[type="range"]')?.value || 0.7;
+                    rain.play().catch(() => alert("Click vào màn hình một phát rồi bật lại nhé!"));
+                    this.state.isRainy = true;
                     btn.classList.add('text-indigo-500');
-                    btn.innerText = '🌧️✨';
+                    btn.innerText = '⛈️';
                 } else {
                     rain.pause();
+                    this.state.isRainy = false;
                     btn.classList.remove('text-indigo-500');
                     btn.innerText = '🌧️';
                 }
@@ -146,7 +155,7 @@
             renderStudy(v) {
                 this.state.queue = DB.vocab.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
                 if(this.state.queue.length === 0) {
-                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Xong rồi! Nghỉ ngơi đi Legend! ☕</div>`;
+                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Hết bài rồi! Học Toán tiếp thôi Hero! 📐</div>`;
                     return;
                 }
                 const item = this.state.queue[0];
@@ -154,8 +163,8 @@
                     <div id="study-card" class="h-full flex flex-col">
                         <div class="relative cursor-pointer" onclick="Core.flip()">
                             <div id="card-front" class="card-side shadow-sm p-6 text-center">
-    <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2>
-</div>
+                                <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2>
+                            </div>
                             <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
                                 <div class="mb-2">${this.getPosTag(item.vi)}</div>
                                 <h2 class="text-3xl font-black text-indigo-600 tracking-tight px-4 leading-tight">
@@ -165,7 +174,7 @@
                             </div>
                         </div>
                         <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none">
-                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl hover:bg-rose-50">AGAIN</button>
+                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl hover:bg-rose-50 transition-colors">AGAIN</button>
                             <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD</button>
                             <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD</button>
                             <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg shadow-indigo-100">EASY</button>
@@ -278,7 +287,7 @@
             },
 
             renderVault(v) {
-                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM TRONG KHO..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM TRONG KHO..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
             },
 
