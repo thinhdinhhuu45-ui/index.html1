@@ -41,11 +41,13 @@
     </div>
 
     <script>
-        // SIÊU CẤU TRÚC DỮ LIỆU INDEXEDDB
+        // --- GIỮ NGUYÊN HỆ THỐNG DB ---
         const DB = {
             vocab: [],
             meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
-            index: new Map(), // O(1) Search Index
+            index: new Map(),
+            cache: new Map(), // Lớp bảo vệ 1: Cache (Dịch rồi không dịch lại)
+            timer: null,      // Lớp bảo vệ 2: Debounce (Gõ xong mới dịch)
             
             async init() {
                 return new Promise((resolve) => {
@@ -64,23 +66,11 @@
             },
 
             async migrateAndLoad() {
-                // Tự động kéo dữ liệu từ LocalStorage cũ sang IndexedDB nếu có
-                const oldVocab = localStorage.getItem('KP_PRO_VOCAB');
-                const oldMeta = localStorage.getItem('KP_PRO_META');
-                
                 const store = this.idb.transaction("store", "readwrite").objectStore("store");
                 const savedVocab = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
                 const savedMeta = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
-
-                if (!savedVocab && oldVocab) {
-                    this.vocab = JSON.parse(oldVocab);
-                    this.meta = JSON.parse(oldMeta);
-                    await this.save();
-                    console.log("Di cư dữ liệu thành công!");
-                } else {
-                    this.vocab = savedVocab || [];
-                    this.meta = savedMeta || { streak: 0, lastDate: null, history: {}, speechRate: 0.9 };
-                }
+                this.vocab = savedVocab || [];
+                this.meta = savedMeta || { streak: 0, lastDate: null, history: {}, speechRate: 0.9 };
             },
 
             async save() {
@@ -197,12 +187,27 @@
                 this.updateStreak(); DB.save(); this.route('study');
             },
 
+            // --- NEXUS ĐÃ ĐƯỢC NÂNG CẤP "GIÁP" ---
             renderNexus(port) {
                 port.innerHTML = ` <div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"> <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"> <input id="in-vi" autocomplete="off" placeholder="NGHĨA CỦA TỪ..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"> <div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div> <button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU VÀO KHO [ENTER]</button> </div> <div class="mt-2 flex flex-col gap-2"> <textarea id="bulk" class="w-full h-32 p-4 outline-none text-xs font-mono bg-white border border-slate-100 rounded-2xl custom-scroll" placeholder="NHẬP NHANH (từ : nghĩa)"></textarea> <button onclick="Core.bulkAdd()" class="w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest">📥 NHẬP DANH SÁCH</button> </div>`;
                 const en = document.getElementById('in-en'); en.focus();
-                en.oninput = async () => {
-                    const val = en.value.trim();
-                    if(val.length > 1) {
+                
+                en.oninput = () => {
+                    const val = en.value.trim().toLowerCase();
+                    if(val.length < 2) return;
+
+                    // 1. Kiểm tra Cache trước (Tốc độ ánh sáng, 0 request)
+                    if (DB.cache.has(val)) {
+                        const data = DB.cache.get(val);
+                        document.getElementById('in-vi').value = data.vi;
+                        document.getElementById('nexus-info').innerText = 'IPA (Cached): ' + (data.ipa || 'N/A');
+                        window.curInf = { ipa: data.ipa };
+                        return;
+                    }
+
+                    // 2. Debounce: Đợi ngừng gõ 300ms mới fetch (Chống ban)
+                    clearTimeout(DB.timer);
+                    DB.timer = setTimeout(async () => {
                         try {
                             const [t, i] = await Promise.all([
                                 fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
@@ -212,12 +217,16 @@
                             const entry = i?.[0];
                             let pos = entry?.meanings[0]?.partOfSpeech.toLowerCase() || '';
                             let tag = pos.includes('noun')?' (n)':pos.includes('verb')?' (v)':pos.includes('adj')?' (adj)':pos.includes('adv')?' (adv)':'';
-                            document.getElementById('in-vi').value = viMean + tag;
                             const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
-                            window.curInf = { ipa };
+                            
+                            // Lưu vào cache
+                            DB.cache.set(val, { vi: viMean + tag, ipa });
+
+                            document.getElementById('in-vi').value = viMean + tag;
                             document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
+                            window.curInf = { ipa };
                         } catch(e) {}
-                    }
+                    }, 300);
                 };
             },
 
@@ -237,7 +246,6 @@
                 area.value = ''; DB.save();
             },
 
-            // SIÊU THUẬT TOÁN TÌM KIẾM & LAZY RENDER
             renderVault(v) {
                 v.innerHTML = `<input id="v-search" autocomplete="off" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
@@ -247,21 +255,14 @@
                 const list = document.getElementById('v-list');
                 const query = q.toLowerCase().trim();
                 list.innerHTML = '';
-                
-                // Tận dụng Map Index để nhảy thẳng đến chữ cái đầu (O(1))
                 let source = DB.vocab;
                 if (query.length > 0) {
                     const firstChar = query[0];
                     if (DB.index.has(firstChar)) {
                         source = DB.index.get(firstChar).filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query));
-                    } else {
-                        source = [];
-                    }
+                    } else { source = []; }
                 }
-
                 const data = [...source].reverse();
-                
-                // LAZY RENDERING: Vẽ dần dần bằng IntersectionObserver
                 const observer = new IntersectionObserver((entries) => {
                     entries.forEach(entry => {
                         if (entry.isIntersecting) {
@@ -271,12 +272,11 @@
                         }
                     });
                 });
-
                 this.appendItems(list, data, 0, observer);
             },
 
             appendItems(container, data, start, observer) {
-                const limit = 20; // Vẽ 20 cái một lúc
+                const limit = 20;
                 const fragment = document.createDocumentFragment();
                 for (let i = start; i < start + limit && i < data.length; i++) {
                     const item = data[i];
@@ -284,10 +284,7 @@
                     div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm";
                     div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase tracking-tighter">${item.en} <span class="text-indigo-400 ml-1 font-bold lowercase">/ ${item.vi}</span></div> <button onclick="Core.del(${item.id})" class="text-rose-400 text-[9px] font-black uppercase tracking-widest">XÓA</button>`;
                     fragment.appendChild(div);
-                    if (i === start + limit - 1) {
-                        div.dataset.index = start + limit;
-                        observer.observe(div);
-                    }
+                    if (i === start + limit - 1) { div.dataset.index = start + limit; observer.observe(div); }
                 }
                 container.appendChild(fragment);
             },
@@ -320,7 +317,6 @@
             }
         };
 
-        // Khởi động hệ thống
         DB.init().then(() => {
             Core.route('study');
             DB.updateUI();
