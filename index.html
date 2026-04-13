@@ -2,325 +2,345 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KP v-PRO | WORLD CLASS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KP v-PRO ULTIMATE | ZERO-DELAY</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --p: #6366f1; --bg: #f8fafc; --txt: #0f172a; --card: #ffffff; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, system-ui, sans-serif; }
-        body { margin: 0; background: var(--bg); color: var(--txt); height: 100dvh; display: flex; justify-content: center; overflow: hidden; }
-        .container { width: 100%; max-width: 480px; display: flex; flex-direction: column; padding: 12px; gap: 10px; }
-        
-        /* Header & Heatmap */
-        header { background: var(--card); padding: 14px 20px; border-radius: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .streak-fire { font-weight: 900; color: #f97316; font-size: 1.3rem; display: flex; align-items: center; gap: 4px; }
-        .heat-map { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
-        .heat-cell { width: 7px; height: 7px; border-radius: 2px; background: #e2e8f0; }
-
-        /* Main View */
-        #view { flex-grow: 1; overflow-y: auto; scrollbar-width: none; position: relative; }
-        #view::-webkit-scrollbar { display: none; }
-
-        /* Card System */
-        .card { background: var(--card); border-radius: 30px; padding: 30px; min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 1.5px solid #e2e8f0; transition: 0.2s cubic-bezier(0.2, 0, 0, 1); cursor: pointer; }
-        .card:active { transform: scale(0.98); border-color: var(--p); }
-        
-        /* Buttons */
-        .btn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        button { border: none; border-radius: 16px; padding: 14px 5px; font-weight: 800; font-size: 10px; text-transform: uppercase; cursor: pointer; transition: 0.1s; background: var(--card); border: 1px solid #e2e8f0; color: #64748b; }
-        button.active { background: #1e293b; color: #fff; transform: translateY(-1px); }
-        .btn-prime { background: var(--p); color: #fff; border: none; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
-
-        input { width: 100%; padding: 15px; border-radius: 18px; border: 2px solid #e2e8f0; outline: none; font-size: 1rem; transition: 0.2s; background: #fff; }
-        input:focus { border-color: var(--p); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
-
-        .item-row { background: #fff; padding: 12px 18px; border-radius: 20px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #f1f5f9; animation: sUp 0.2s ease-out; }
-        @keyframes sUp { from { opacity: 0; transform: translateY(8px); } }
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
+        .tab-active { background: #1e293b !important; color: white !important; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; background: white; border: 2px solid #e2e8f0; border-radius: 20px; width: 100%; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .heat-map { display: grid; grid-template-columns: repeat(21, 1fr); gap: 2px; }
+        .heat-cell { height: 8px; border-radius: 1.5px; background: #e2e8f0; transition: background 0.3s; }
+        .hidden { display: none !important; }
+        .custom-scroll::-webkit-scrollbar { display: none; }
+        @keyframes gold-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .rank-legend { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; animation: gold-pulse 2s infinite; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <div class="streak-fire">🔥 <span id="streak">0</span></div>
-            <div id="heatmap" class="heat-map"></div>
+<body class="flex justify-center p-2 sm:p-4">
+    <div class="w-full max-w-lg flex flex-col h-[98dvh]">
+        <header class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex justify-between items-center mb-2">
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                    <span class="font-black text-orange-500 text-xl">🔥 <span id="streak">0</span></span>
+                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase bg-slate-100 text-slate-500">NEWBIE</span>
+                </div>
+                <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
+            </div>
+            <div id="heatmap" class="heat-map w-16 sm:w-20"></div>
         </header>
 
-        <main id="view"></main>
+        <main id="view" class="flex-grow overflow-hidden relative"></main>
 
-        <nav class="btn-grid">
-            <button onclick="Core.route('study')" id="n-study">Study</button>
-            <button onclick="Core.route('nexus')" id="n-nexus">Nexus</button>
-            <button onclick="Core.route('vault')" id="n-vault">Vault</button>
-            <button onclick="Core.route('data')" id="n-data">Data</button>
+        <nav class="mt-2 grid grid-cols-4 gap-1.5">
+            <button onclick="Core.route('study')" id="n-study" class="bg-white border border-slate-200 py-3.5 rounded-xl font-black text-slate-500 text-[11px] uppercase tracking-tighter transition-all active:scale-95">Study</button>
+            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-white border border-slate-200 py-3.5 rounded-xl font-black text-slate-500 text-[11px] uppercase tracking-tighter transition-all active:scale-95">Nexus</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-white border border-slate-200 py-3.5 rounded-xl font-black text-slate-500 text-[11px] uppercase tracking-tighter transition-all active:scale-95">Vault</button>
+            <button onclick="Core.route('data')" id="n-data" class="bg-white border border-slate-200 py-3.5 rounded-xl font-black text-slate-400 text-[10px] uppercase transition-all active:scale-95">Data</button>
         </nav>
     </div>
 
     <script>
-        const $ = (id) => document.getElementById(id);
-        
+        // CẤU TRÚC TRIE CHO SEARCH O(L)
+        class TrieNode {
+            constructor() {
+                this.children = {};
+                this.items = []; // Lưu trữ danh sách các từ đi qua node này
+            }
+        }
+
         const DB = {
             vocab: new Map(),
             meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
-            trie: {},
-            apiCache: new Map(),
+            trie: new TrieNode(),
 
             async init() {
-                return new Promise(r => {
-                    const req = indexedDB.open("KP_VPRO_WORLD", 1);
-                    req.onupgradeneeded = e => {
+                return new Promise((resolve) => {
+                    const request = indexedDB.open("KP_ULTIMATE", 1);
+                    request.onupgradeneeded = (e) => {
                         const db = e.target.result;
                         db.createObjectStore("vocab", { keyPath: "id" });
                         db.createObjectStore("meta");
                     };
-                    req.onsuccess = async e => {
+                    request.onsuccess = async (e) => {
                         this.idb = e.target.result;
                         await this.loadAll();
-                        r();
+                        this.buildTrie();
+                        resolve();
                     };
                 });
             },
 
-            addToTrie(item) {
-                let n = this.trie;
-                for (let c of item.en.toLowerCase()) {
-                    if (!n[c]) n[c] = {};
-                    n = n[c];
-                }
-                if (!n._i) n._i = new Set();
-                n._i.add(item.id);
-            },
-
-            removeFromTrie(item) {
-                const backtrack = (node, chars, index) => {
-                    if (index === chars.length) {
-                        if (node._i) node._i.delete(item.id);
-                        return Object.keys(node).length === (node._i?.size === 0 ? 0 : 1); 
-                    }
-                    const char = chars[index];
-                    if (node[char] && backtrack(node[char], chars, index + 1)) {
-                        delete node[char];
-                        return Object.keys(node).length === (node._i ? 1 : 0);
-                    }
-                    return false;
-                };
-                backtrack(this.trie, item.en.toLowerCase(), 0);
-            },
-
-            searchTrie(q, limit = 20) {
-                let n = this.trie;
-                for (let c of q.toLowerCase()) {
-                    if (!n[c]) return [];
-                    n = n[c];
-                }
-                const res = [];
-                const collect = (node) => {
-                    if (res.length >= limit) return;
-                    if (node._i) res.push(...node._i);
-                    for (let k in node) if (k !== '_i') collect(node[k]);
-                };
-                collect(n);
-                return res.slice(0, limit);
-            },
-
             async loadAll() {
                 const tx = this.idb.transaction(["vocab", "meta"], "readonly");
-                const [v, m] = await Promise.all([
-                    new Promise(r => tx.objectStore("vocab").getAll().onsuccess = e => r(e.target.result)),
-                    new Promise(r => tx.objectStore("meta").get("g").onsuccess = e => r(e.target.result))
-                ]);
-                v.forEach(item => { this.vocab.set(item.id, item); this.addToTrie(item); });
-                if (m) this.meta = m;
-                this.syncUI();
+                const vStore = tx.objectStore("vocab");
+                const mStore = tx.objectStore("meta");
+
+                const vocabs = await new Promise(r => vStore.getAll().onsuccess = e => r(e.target.result));
+                const meta = await new Promise(r => mStore.get("global").onsuccess = e => r(e.target.result));
+
+                vocabs.forEach(v => this.vocab.set(v.id, v));
+                if (meta) this.meta = meta;
+                
+                // Di cư dữ liệu cũ nếu có
+                if (this.vocab.size === 0 && localStorage.getItem('KP_PRO_VOCAB')) {
+                    const old = JSON.parse(localStorage.getItem('KP_PRO_VOCAB'));
+                    const writeTx = this.idb.transaction("vocab", "readwrite").objectStore("vocab");
+                    old.forEach(v => { this.vocab.set(v.id, v); writeTx.put(v); });
+                    console.log("Migration complete!");
+                }
             },
 
-            syncUI() {
-                $('streak').innerText = this.meta.streak;
-                const h = $('heatmap'); h.innerHTML = '';
-                for(let i=13; i>=0; i--) {
-                    const d = new Date(); d.setDate(d.getDate() - i);
-                    const count = this.meta.history[d.toDateString()] || 0;
-                    const c = document.createElement('div');
-                    c.className = 'heat-cell';
-                    c.style.background = count > 0 ? `rgba(99, 102, 241, ${Math.min(0.2 + count * 0.25, 1)})` : '#e2e8f0';
-                    h.appendChild(c);
+            buildTrie() {
+                this.trie = new TrieNode();
+                this.vocab.forEach(item => this.addToTrie(item));
+            },
+
+            addToTrie(item) {
+                let node = this.trie;
+                const word = item.en.toLowerCase();
+                for (let char of word) {
+                    if (!node.children[char]) node.children[char] = new TrieNode();
+                    node = node.children[char];
+                    node.items.push(item.id);
                 }
+            },
+
+            async saveItem(item) {
+                this.vocab.set(item.id, item);
+                const tx = this.idb.transaction("vocab", "readwrite");
+                tx.objectStore("vocab").put(item);
+                this.buildTrie(); // Rebuild để search chính xác
+                this.updateUI();
+            },
+
+            async saveMeta() {
+                const tx = this.idb.transaction("meta", "readwrite");
+                tx.objectStore("meta").put(this.meta, "global");
+                this.updateUI();
+            },
+
+            updateUI() {
+                document.getElementById('streak').innerText = this.meta.streak;
+                const mastered = Array.from(this.vocab.values()).filter(i => i.ef > 3.2).length;
+                document.getElementById('mastery').innerText = `MASTERED: ${this.vocab.size ? Math.round(mastered/this.vocab.size*100) : 0}%`;
+                this.renderHeatmap();
+            },
+
+            renderHeatmap() {
+                const h = document.getElementById('heatmap');
+                if (!h.children.length) {
+                    for(let i=20; i>=0; i--) {
+                        const cell = document.createElement('div');
+                        cell.className = 'heat-cell';
+                        const d = new Date(); d.setDate(d.getDate() - i);
+                        cell.id = `hc-${d.toDateString()}`;
+                        h.appendChild(cell);
+                    }
+                }
+                const today = new Date().toDateString();
+                const count = this.meta.history[today] || 0;
+                const cell = document.getElementById(`hc-${today}`);
+                if (cell) cell.style.background = `rgba(79, 70, 229, ${Math.min(0.2 + count * 0.15, 1)})`;
             }
         };
 
         const Core = {
-            state: { view: '', queue: [], debouncer: null },
+            state: { view: '', flipped: false, queue: [] },
+            
+            speak(txt) {
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance(txt);
+                msg.lang = 'en-US'; msg.rate = DB.meta.speechRate || 0.9;
+                window.speechSynthesis.speak(msg);
+            },
+
+            updateRank() {
+                const count = DB.vocab.size;
+                const tag = document.getElementById('rank-tag');
+                let rank = { n: 'NEWBIE', c: 'bg-slate-100 text-slate-500' };
+                if (count > 1000) rank = { n: 'LEGEND', c: 'rank-legend' };
+                else if (count > 500) rank = { n: 'SCHOLAR', c: 'bg-indigo-600 text-white' };
+                else if (count > 100) rank = { n: 'SURVIVOR', c: 'bg-orange-500 text-white' };
+                tag.innerText = rank.n; tag.className = `text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${rank.c}`;
+            },
 
             route(v) {
-                this.state.view = v;
-                document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.id === `n-${v}`));
-                this['render' + v.charAt(0).toUpperCase() + v.slice(1)]();
+                this.state.view = v; this.state.flipped = false;
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active', 'border-slate-900'));
+                document.getElementById('n-'+v).classList.add('tab-active', 'border-slate-900');
+                const port = document.getElementById('view'); port.innerHTML = '';
+                if (v === 'study') this.renderStudy(port);
+                else if (v === 'nexus') this.renderNexus(port);
+                else if (v === 'vault') this.renderVault(port);
+                else if (v === 'data') this.renderData(port);
+                this.updateRank();
             },
 
-            speak(t) {
-                window.speechSynthesis.cancel();
-                const m = new SpeechSynthesisUtterance(t);
-                m.rate = DB.meta.speechRate;
-                window.speechSynthesis.speak(m);
-            },
-
-            renderStudy() {
-                const now = Date.now();
-                this.state.queue = Array.from(DB.vocab.values()).filter(i => i.next <= now).sort((a,b) => a.next - b.next);
-                const v = $('view');
-                if (!this.state.queue.length) {
-                    v.innerHTML = `<div class="card" style="border-style:dashed; color:#94a3b8">🏆 HOÀN THÀNH!<br><small>Hẹn gặp lại bạn ngày mai</small></div>`;
+            renderStudy(v) {
+                this.state.queue = Array.from(DB.vocab.values()).filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
+                if(!this.state.queue.length) {
+                    v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Hết từ rồi! Làm bài tập Toán thôi! 📐</div>`;
                     return;
                 }
                 const item = this.state.queue[0];
-                v.innerHTML = `
-                    <div class="card" onclick="Core.flip()">
-                        <div id="q-side">
-                            <h1 style="font-size:3.2rem; margin:0; letter-spacing:-2px; text-transform:uppercase">${item.en}</h1>
-                        </div>
-                        <div id="a-side" style="display:none">
-                            <h2 style="color:var(--p); font-size:2.2rem; text-transform:uppercase; margin:0">${item.vi}</h2>
-                            <p style="color:#94a3b8; font-family:monospace">${item.ipa || ''}</p>
-                        </div>
-                    </div>
-                    <div id="ctrl" class="btn-grid" style="margin-top:12px; visibility:hidden">
-                        <button onclick="Core.ans(1)" style="color:#ef4444">Again</button>
-                        <button onclick="Core.ans(3)">Hard</button>
-                        <button onclick="Core.ans(4)">Good</button>
-                        <button onclick="Core.ans(5)" class="btn-prime">Easy</button>
-                    </div>`;
+                v.innerHTML = `<div id="study-card" class="h-full flex flex-col"><div class="relative cursor-pointer" onclick="Core.flip()"><div id="f" class="card-side shadow-sm p-6 text-center"><h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2></div><div id="b" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/10"><h2 class="text-3xl font-black text-indigo-600 tracking-tight">${item.vi}</h2><p class="text-indigo-300 font-mono text-xs mt-4">${item.ipa||''}</p></div></div><div id="ctrl" class="grid grid-cols-4 gap-1.5 mt-2 opacity-10 pointer-events-none transition-opacity"><button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl active:bg-rose-50">AGAIN</button><button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD</button><button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD</button><button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY</button></div></div>`;
             },
 
             flip() {
-                $('q-side').style.display = 'none';
-                $('a-side').style.display = 'block';
-                $('ctrl').style.visibility = 'visible';
-                this.speak(this.state.queue[0].en);
+                if (this.state.view !== 'study' || !this.state.queue.length) return;
+                this.state.flipped = !this.state.flipped;
+                document.getElementById('f').classList.toggle('hidden', this.state.flipped);
+                document.getElementById('b').classList.toggle('hidden', !this.state.flipped);
+                document.getElementById('ctrl').classList.remove('opacity-10', 'pointer-events-none');
+                if(this.state.flipped) this.speak(this.state.queue[0].en);
             },
 
-            async ans(q) {
+            ans(q) {
+                if(!this.state.flipped) return;
                 const item = this.state.queue[0];
                 let { reps: r, ef, interval: i } = item;
-                if (q >= 3) {
-                    i = (r === 0) ? 1 : (r === 1 ? 4 : Math.round(i * ef));
-                    r++;
-                } else { r = 0; i = 1; }
+                if (q >= 3) { if (r === 0) i = 1; else if (r === 1) i = 4; else i = Math.round(i * ef); r++; }
+                else { r = 0; i = 1; }
                 ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
-                Object.assign(item, { reps: r, ef, interval: i, next: Date.now() + (i * 86400000) });
-                
-                const d = new Date().toDateString();
-                DB.meta.history[d] = (DB.meta.history[d] || 0) + 1;
-                this.updateStreak();
+                item.reps = r; item.ef = ef; item.interval = i; item.next = Date.now() + (i * 86400000);
+                const t = new Date().toDateString(); DB.meta.history[t] = (DB.meta.history[t] || 0) + 1;
+                this.updateStreak(); DB.saveItem(item); DB.saveMeta(); this.route('study');
+            },
 
-                const tx = DB.idb.transaction(["vocab", "meta"], "readwrite");
-                tx.objectStore("vocab").put(item);
-                tx.objectStore("meta").put(DB.meta, "g");
-                await new Promise(r => tx.oncomplete = r);
-                this.route('study');
+            renderNexus(port) {
+                port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-3xl flex flex-col gap-4 shadow-sm"><input id="in-en" autocomplete="off" placeholder="ENGLISH WORD..." class="w-full p-4 border-2 border-slate-50 rounded-2xl outline-none focus:border-indigo-500 font-black text-3xl uppercase tracking-tighter text-slate-800"><input id="in-vi" autocomplete="off" placeholder="MEANING..." class="w-full p-4 border-2 border-slate-50 rounded-2xl outline-none focus:border-indigo-500 font-bold text-indigo-500 text-lg"><button onclick="Core.add()" class="bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all">SAVE TO VAULT [ENTER]</button></div>`;
+                const en = document.getElementById('in-en'); en.focus();
+                en.oninput = async () => {
+                    if(en.value.length > 1) {
+                        try {
+                            const [t, i] = await Promise.all([
+                                fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${en.value}`).then(r => r.json()),
+                                fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${en.value}`).then(r => r.json()).catch(() => null)
+                            ]);
+                            document.getElementById('in-vi').value = t?.[0]?.[0]?.[0]?.toLowerCase() || '';
+                            window.curIpa = i?.[0]?.phonetic || '';
+                        } catch(e) {}
+                    }
+                };
+            },
+
+            add() {
+                const en = document.getElementById('in-en')?.value.trim();
+                const vi = document.getElementById('in-vi')?.value.trim();
+                if(!en || !vi) return;
+                const item = { id: Date.now(), en, vi, ipa: window.curIpa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() };
+                DB.saveItem(item);
+                const t = new Date().toDateString(); DB.meta.history[t] = (DB.meta.history[t] || 0) + 1;
+                DB.saveMeta();
+                this.speak(en); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
+            },
+
+            // TÌM KIẾM TRIE + VIRTUAL RENDER
+            renderVault(v) {
+                v.innerHTML = `<input id="v-search" autocomplete="off" oninput="Core.search(this.value)" placeholder="TÌM KIẾM NHANH..." class="w-full p-4 mb-2 border-2 border-slate-50 rounded-2xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                this.search('');
+            },
+
+            search(q) {
+                const list = document.getElementById('v-list');
+                const query = q.toLowerCase().trim();
+                list.innerHTML = '';
+                
+                let ids = [];
+                if (!query) {
+                    ids = Array.from(DB.vocab.keys());
+                } else {
+                    // Search O(L) trong Trie
+                    let node = DB.trie;
+                    for (let char of query) {
+                        if (node.children[char]) node = node.children[char];
+                        else { ids = []; break; }
+                        ids = node.items;
+                    }
+                }
+
+                const data = ids.map(id => DB.vocab.get(id)).reverse();
+                
+                const obs = new IntersectionObserver((entries) => {
+                    entries.forEach(e => {
+                        if (e.isIntersecting) {
+                            const idx = parseInt(e.target.dataset.index);
+                            if (idx < data.length) this.append(list, data, idx, obs);
+                            obs.unobserve(e.target);
+                        }
+                    });
+                });
+                this.append(list, data, 0, obs);
+            },
+
+            append(container, data, start, obs) {
+                const limit = 15;
+                const frag = document.createDocumentFragment();
+                for (let i = start; i < start + limit && i < data.length; i++) {
+                    const item = data[i];
+                    const div = document.createElement('div');
+                    div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm";
+                    div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase">${item.en} <span class="text-indigo-400 font-bold lowercase">/ ${item.vi}</span></div><button onclick="Core.del(${item.id})" class="text-rose-300 text-[9px] font-black uppercase">XÓA</button>`;
+                    frag.appendChild(div);
+                    if (i === start + limit - 1) { div.dataset.index = start + limit; obs.observe(div); }
+                }
+                container.appendChild(frag);
+            },
+
+            del(id) {
+                DB.vocab.delete(id);
+                const tx = DB.idb.transaction("vocab", "readwrite");
+                tx.objectStore("vocab").delete(id);
+                DB.buildTrie();
+                this.search(document.getElementById('v-search')?.value || '');
+            },
+
+            renderData(v) {
+                v.innerHTML = `<div class="bg-white p-8 rounded-3xl flex flex-col gap-6 border border-slate-100 shadow-sm"><div class="p-4 bg-slate-50 rounded-2xl text-center"><label class="text-[10px] font-black text-slate-400 uppercase block mb-3">Tốc độ: ${DB.meta.speechRate}x</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=this.value; DB.saveMeta()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Export</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Import</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"><button onclick="if(confirm('Format?')){indexedDB.deleteDatabase('KP_ULTIMATE');location.reload()}" class="mt-4 text-rose-300 text-[9px] font-black uppercase tracking-widest">Wipe Everything</button></div>`;
             },
 
             updateStreak() {
                 const today = new Date().toDateString();
-                if (DB.meta.lastDate !== today) {
+                if(DB.meta.lastDate !== today) {
                     const last = new Date(DB.meta.lastDate);
-                    DB.meta.streak = (DB.meta.lastDate && (new Date() - last) < 172800000) ? DB.meta.streak + 1 : 1;
+                    DB.meta.streak = ((new Date() - last) / 86400000 <= 1.5) ? DB.meta.streak + 1 : 1;
                     DB.meta.lastDate = today;
                 }
             },
-
-            renderNexus() {
-                $('view').innerHTML = `
-                    <div class="card" style="min-height:auto; gap:16px; padding:25px">
-                        <input id="in-en" placeholder="English Word..." oninput="Core.nexusDebounce()">
-                        <input id="in-vi" placeholder="Meaning...">
-                        <button onclick="Core.add()" class="btn-prime" style="width:100%">SAVE TO VAULT</button>
-                    </div>`;
-                $('in-en').focus();
+            export() { 
+                const data = { v: Array.from(DB.vocab.values()), m: DB.meta };
+                const b = new Blob([JSON.stringify(data)], {type: 'application/json'});
+                const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Ultimate_Backup.json'; a.click(); 
             },
-
-            nexusDebounce() {
-                clearTimeout(this.state.debouncer);
-                this.state.debouncer = setTimeout(async () => {
-                    const val = $('in-en').value.trim();
-                    if (val.length < 2) return;
-                    if (DB.apiCache.has(val)) {
-                        const cached = DB.apiCache.get(val);
-                        $('in-vi').value = cached.vi;
-                        this.state.lastIpa = cached.ipa;
-                        return;
-                    }
-                    try {
-                        const [t, i] = await Promise.all([
-                            fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
-                            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
-                        ]);
-                        const vi = t?.[0]?.[0]?.[0] || '';
-                        const ipa = i?.[0]?.phonetic || '';
-                        $('in-vi').value = vi;
-                        this.state.lastIpa = ipa;
-                        DB.apiCache.set(val, { vi, ipa });
-                    } catch(e) {}
-                }, 400);
-            },
-
-            add() {
-                const en = $('in-en').value.trim(), vi = $('in-vi').value.trim();
-                if (!en || !vi) return;
-                const item = { id: Date.now(), en, vi, ipa: this.state.lastIpa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() };
-                DB.vocab.set(item.id, item);
-                DB.addToTrie(item);
-                const tx = DB.idb.transaction("vocab", "readwrite");
-                tx.objectStore("vocab").put(item);
-                this.speak(en);
-                this.route('nexus');
-            },
-
-            renderVault() {
-                $('view').innerHTML = `<input id="v-search" placeholder="Search Vault..." oninput="Core.vaultSearch(this.value)"><div id="v-list" style="margin-top:10px"></div>`;
-                this.vaultSearch('');
-            },
-
-            vaultSearch(q) {
-                const ids = q ? DB.searchTrie(q) : Array.from(DB.vocab.keys()).slice(-30);
-                const html = ids.reverse().map(id => {
-                    const it = DB.vocab.get(id);
-                    return `<div class="item-row"><div><b>${it.en}</b><br><small style="color:var(--p)">${it.vi}</small></div><button onclick="Core.del(${id})" style="border:none; color:#fb7185; font-size:9px">DEL</button></div>`;
-                }).join('');
-                $('v-list').innerHTML = html;
-            },
-
-            del(id) {
-                const item = DB.vocab.get(id);
-                if (item) {
-                    DB.removeFromTrie(item);
-                    DB.vocab.delete(id);
-                    DB.idb.transaction("vocab", "readwrite").objectStore("vocab").delete(id);
-                    this.renderVault();
-                    DB.syncUI();
-                }
-            },
-
-            renderData() {
-                $('view').innerHTML = `
-                    <div class="card" style="min-height:auto; gap:12px; padding:25px">
-                        <label style="font-size:10px; font-weight:900; color:#94a3b8">SPEECH RATE: ${DB.meta.speechRate}x</label>
-                        <input type="range" min="0.5" max="1.2" step="0.1" value="${DB.meta.speechRate}" oninput="DB.meta.speechRate=parseFloat(this.value); Core.saveMeta()">
-                        <button onclick="Core.export()" style="width:100%">EXPORT BACKUP</button>
-                        <button onclick="if(confirm('Wipe All?')){indexedDB.deleteDatabase('KP_VPRO_WORLD'); location.reload()}" style="width:100%; color:#ef4444; border:none">FACTORY RESET</button>
-                    </div>`;
-            },
-
-            saveMeta() {
-                const tx = DB.idb.transaction("meta", "readwrite");
-                tx.objectStore("meta").put(DB.meta, "g");
-            },
-
-            export() {
-                const data = JSON.stringify(Array.from(DB.vocab.values()));
-                const blob = new Blob([data], {type: 'application/json'});
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'vpro_backup.json'; a.click();
+            import(el) {
+                const r = new FileReader(); r.onload = async (e) => {
+                    const d = JSON.parse(e.target.result);
+                    const tx = DB.idb.transaction(["vocab", "meta"], "readwrite");
+                    tx.objectStore("meta").put(d.m, "global");
+                    d.v.forEach(v => tx.objectStore("vocab").put(v));
+                    location.reload();
+                }; r.readAsText(el.files[0]);
             }
         };
 
-        DB.init().then(() => Core.route('study'));
+        // Hotkeys: Phản xạ cực nhanh
+        window.onkeydown = (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
+                return;
+            }
+            const k = e.key.toLowerCase();
+            if (k === 's') Core.route('study'); if (k === 'n') Core.route('nexus'); if (k === 'v') Core.route('vault');
+            if (Core.state.view === 'study' && Core.state.queue.length) {
+                if (e.code === 'Space') { e.preventDefault(); Core.flip(); }
+                if (Core.state.flipped && '12345'.includes(k)) {
+                    if (k === '1') Core.ans(0); if (k === '2') Core.ans(1); if (k === '3') Core.ans(3); if (k === '5') Core.ans(5);
+                }
+            }
+        };
+
+        DB.init().then(() => { Core.route('study'); DB.updateUI(); });
     </script>
 </body>
 </html>
