@@ -523,51 +523,51 @@
 
 
         // --- KEYBOARD ENGINE (Bộ não phím tắt) ---
-
         window.onkeydown = (e) => {
-
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
-
+                // Nhấn Enter ở ô input đơn (in-en)
                 if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
 
+                // MỚI: Nhấn Enter ở ô nhập nhanh (textarea id="bulk")
+                if (e.key === 'Enter' && e.target.id === 'bulk' && !e.shiftKey) {
+                    e.preventDefault();
+                    const lines = e.target.value.split('\n');
+                    lines.forEach(line => {
+                        if (line.includes(':')) {
+                            const [en, vi] = line.split(':').map(s => s.trim());
+                            if (en && vi) {
+                                DB.vocab.push({ 
+                                    id: Date.now() + Math.random(), 
+                                    en, vi, ipa: '', ex: '', 
+                                    reps: 0, ef: 2.5, interval: 0, next: Date.now() 
+                                });
+                            }
+                        }
+                    });
+                    e.target.value = ''; // Xóa sạch ô nhập sau khi lưu
+                    DB.save();
+                    if(document.getElementById('nexus-info')) 
+                        document.getElementById('nexus-info').innerText = "ĐÃ LƯU DỮ LIỆU NHẬP NHANH!";
+                }
                 return;
-
             }
 
             const key = e.key.toLowerCase();
-
             if (key === 's') Core.route('study');
-
             if (key === 'n') Core.route('nexus');
-
             if (key === 'v') Core.route('vault');
-
             
-
             if (Core.state.view === 'study' && Core.state.queue.length > 0) {
-
                 if (e.code === 'Space' || key === 'f') { e.preventDefault(); Core.flip(); }
-
                 if (Core.state.flipped) {
-
                     if (key === '1') Core.ans(0); if (key === '2') Core.ans(1);
-
                     if (key === '3') Core.ans(3); if (key === '4') Core.ans(5);
-
                 }
-
             }
-
         };
 
-
-
         // Khởi động
-
         Core.route('study');
-
     </script>
-
 </body>
-
 </html>
