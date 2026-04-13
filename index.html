@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KP v-PRO MAX | MERGE EDITION</title>
+    <title>KP v-PRO MAX | ULTIMATE EDITION</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
@@ -13,8 +13,6 @@
         .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
         .hidden { display: none !important; }
         .custom-scroll::-webkit-scrollbar { display: none; }
-        @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-        .rank-legend { background: #f59e0b; color: white; animation: pulse-gold 2s infinite; }
     </style>
 </head>
 <body class="flex justify-center p-2 sm:p-4">
@@ -23,7 +21,7 @@
             <div class="flex flex-col">
                 <div class="flex items-center gap-2">
                     <span class="font-black text-orange-500 text-lg">🔥 <span id="streak">0</span></span>
-                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">NEWBIE</span>
+                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">PRO MAX</span>
                 </div>
                 <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
             </div>
@@ -44,7 +42,6 @@
         const DB = {
             vocab: [],
             meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
-            index: new Map(),
             cache: new Map(),
             timer: null,
             
@@ -54,45 +51,27 @@
                     request.onupgradeneeded = (e) => { e.target.result.createObjectStore("store"); };
                     request.onsuccess = async (e) => {
                         this.idb = e.target.result;
-                        await this.migrateAndLoad();
-                        this.rebuildIndex();
+                        const store = this.idb.transaction("store", "readonly").objectStore("store");
+                        const v = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
+                        const m = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
+                        if (v) this.vocab = v; if (m) this.meta = m;
                         resolve();
                     };
                 });
-            },
-
-            async migrateAndLoad() {
-                const store = this.idb.transaction("store", "readwrite").objectStore("store");
-                const savedVocab = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
-                const savedMeta = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
-                if (savedVocab) { this.vocab = savedVocab; this.meta = savedMeta; }
             },
 
             async save() {
                 const tx = this.idb.transaction("store", "readwrite");
                 tx.objectStore("store").put(this.vocab, "vocab");
                 tx.objectStore("store").put(this.meta, "meta");
-                this.rebuildIndex();
                 this.updateUI();
-            },
-
-            rebuildIndex() {
-                this.index.clear();
-                this.vocab.forEach(v => {
-                    const char = v.en[0]?.toLowerCase();
-                    if (!this.index.has(char)) this.index.set(char, []);
-                    this.index.get(char).push(v);
-                });
             },
 
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
-                const mastered = this.vocab.filter(i => i.ef > 3.2).length;
-                document.getElementById('mastery').innerText = `MASTERED: ${this.vocab.length ? Math.round(mastered/this.vocab.length*100) : 0}%`;
-                this.renderHeatmap();
-            },
-
-            renderHeatmap() {
+                const active = this.vocab.filter(i => !i.trash);
+                const mastered = active.filter(i => i.ef > 3.2).length;
+                document.getElementById('mastery').innerText = `MASTERED: ${active.length ? Math.round(mastered/active.length*100) : 0}%`;
                 const h = document.getElementById('heatmap'); h.innerHTML = '';
                 const today = new Date();
                 for(let i=15; i>=0; i--) {
@@ -107,7 +86,7 @@
         };
 
         const Core = {
-            state: { view: '', flipped: false, queue: [] },
+            state: { view: '', flipped: false, queue: [], isTrashView: false },
             
             speak(txt) {
                 window.speechSynthesis.cancel();
@@ -117,7 +96,7 @@
             },
 
             route(v) {
-                this.state.view = v; this.state.flipped = false;
+                this.state.view = v; this.state.flipped = false; this.state.isTrashView = false;
                 document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
                 const btn = document.getElementById('n-'+v); if(btn) btn.classList.add('tab-active');
                 const port = document.getElementById('view'); port.innerHTML = '';
@@ -128,13 +107,13 @@
             },
 
             renderStudy(v) {
-                this.state.queue = DB.vocab.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
+                this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
                 if(!this.state.queue.length) {
                     v.innerHTML = `<div class="card-side text-slate-300 font-black border-dashed text-xs uppercase px-12 text-center">Xong hết rồi! Nghỉ ngơi đi Hero! 📐</div>`;
                     return;
                 }
                 const item = this.state.queue[0];
-                v.innerHTML = `<div id="study-card" class="h-full flex flex-col"><div class="relative cursor-pointer" onclick="Core.flip()"><div id="card-front" class="card-side shadow-sm p-6 text-center"><h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2></div><div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20"><h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2><p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p></div></div><div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity"><button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN</button><button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD</button><button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD</button><button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY</button></div></div>`;
+                v.innerHTML = `<div class="h-full flex flex-col"><div class="relative cursor-pointer" onclick="Core.flip()"><div id="card-front" class="card-side shadow-sm p-6 text-center"><h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2></div><div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20"><h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2><p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p></div></div><div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity"><button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN [1]</button><button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD [2]</button><button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD [3]</button><button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button></div></div>`;
             },
 
             flip() {
@@ -142,7 +121,7 @@
                 this.state.flipped = !this.state.flipped;
                 document.getElementById('card-front').classList.toggle('hidden', this.state.flipped);
                 document.getElementById('card-back').classList.toggle('hidden', !this.state.flipped);
-                document.getElementById('study-controls').classList.remove('opacity-20', 'pointer-events-none');
+                document.getElementById('study-controls')?.classList.remove('opacity-20', 'pointer-events-none');
                 if(this.state.flipped) this.speak(this.state.queue[0].en);
             },
 
@@ -160,31 +139,27 @@
             },
 
             renderNexus(port) {
-                port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"><input id="in-en" autocomplete="off" placeholder="ENGLISH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"><input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"><div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div><button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU [ENTER]</button></div><div class="mt-2 flex flex-col gap-2"><textarea id="bulk" class="w-full h-32 p-4 outline-none text-xs font-mono bg-white border border-slate-100 rounded-2xl custom-scroll" placeholder="NHẬP NHANH (từ : nghĩa)"></textarea><button onclick="Core.bulkAdd()" class="w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px] uppercase">📥 NHẬP DANH SÁCH</button></div>`;
+                port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"><input id="in-en" autocomplete="off" placeholder="ENGLISH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"><input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"><div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div><button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU [ENTER]</button></div>`;
                 const en = document.getElementById('in-en'); en.focus();
                 en.oninput = () => {
                     const val = en.value.trim().toLowerCase();
                     if(val.length < 2) return;
                     if(DB.cache.has(val)) { 
                         const d = DB.cache.get(val); document.getElementById('in-vi').value = d.vi; 
-                        document.getElementById('nexus-info').innerText = 'Cached'; window.curInf = {ipa: d.ipa}; return; 
+                        document.getElementById('nexus-info').innerText = 'IPA: ' + (d.ipa || 'N/A'); window.curInf = {ipa: d.ipa}; return; 
                     }
                     clearTimeout(DB.timer);
                     DB.timer = setTimeout(async () => {
                         try {
                             const cId = 'gtx' + Math.floor(Math.random()*10000);
                             const [t, i] = await Promise.all([
-                                fetch(`https://translate.googleapis.com/translate_a/single?client=${cId}&sl=en&tl=vi&dt=t&dt=bd&dt=at&dt=ss&q=${encodeURIComponent(val)}`).then(r => r.json()),
+                                fetch(`https://translate.googleapis.com/translate_a/single?client=${cId}&sl=en&tl=vi&dt=t&q=${encodeURIComponent(val)}`).then(r => r.json()),
                                 fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
                             ]);
                             let mean = t?.[0]?.[0]?.[0] || '';
-                            const entry = i?.[0];
-                            const ipa = entry?.phonetic || '';
-                            const pos = entry?.meanings[0]?.partOfSpeech || '';
-                            const tag = pos ? ` (${pos.slice(0,3)})` : '';
-                            const final = mean + tag;
-                            DB.cache.set(val, {vi: final, ipa});
-                            document.getElementById('in-vi').value = final;
+                            const ipa = i?.[0]?.phonetic || '';
+                            DB.cache.set(val, {vi: mean, ipa});
+                            document.getElementById('in-vi').value = mean;
                             document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
                             window.curInf = {ipa};
                         } catch(e) {}
@@ -196,43 +171,48 @@
                 const en = document.getElementById('in-en')?.value.trim();
                 const vi = document.getElementById('in-vi')?.value.trim();
                 if(!en || !vi) return;
-                DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
+                DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now(), trash: false });
                 DB.save(); this.speak(en); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
             },
 
-            bulkAdd() {
-                const area = document.getElementById('bulk'); const val = area.value.trim(); if(!val) return;
-                val.split('\n').forEach(line => {
-                    if (line.includes(':')) {
-                        const [en, vi] = line.split(':').map(s => s.trim());
-                        if (en && vi) DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
-                    }
-                });
-                area.value = ''; DB.save();
+            renderVault(v) {
+                v.innerHTML = `<div class="flex gap-2 mb-2"><input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="flex-grow p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><button onclick="Core.toggleTrash()" id="trash-btn" class="px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]">THÙNG RÁC</button></div><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
+                this.search('');
             },
 
-            renderVault(v) {
-                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="w-full p-4 mb-2 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
-                this.search('');
+            toggleTrash() {
+                this.state.isTrashView = !this.state.isTrashView;
+                const btn = document.getElementById('trash-btn');
+                btn.innerText = this.state.isTrashView ? "QUAY LẠI" : "THÙNG RÁC";
+                btn.className = this.state.isTrashView ? "px-4 bg-orange-500 text-white rounded-xl font-black text-[10px]" : "px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]";
+                this.search(document.getElementById('v-search').value);
             },
 
             search(q) {
                 const list = document.getElementById('v-list'); list.innerHTML = '';
                 const query = q.toLowerCase().trim();
-                let source = DB.vocab;
-                if(query) source = DB.vocab.filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query));
-                source.slice(-30).reverse().forEach(item => {
+                const source = DB.vocab.filter(i => {
+                    const m = i.en.toLowerCase().includes(query) || i.vi.includes(query);
+                    return this.state.isTrashView ? (i.trash && m) : (!i.trash && m);
+                });
+                source.slice(-40).reverse().forEach(item => {
                     const div = document.createElement('div');
-                    div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl";
-                    div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase">${item.en} <span class="text-indigo-400 ml-1 font-bold">/ ${item.vi}</span></div><button onclick="Core.del(${item.id})" class="text-rose-400 text-[9px] font-black uppercase">XÓA</button>`;
+                    div.className = "flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm";
+                    if (this.state.isTrashView) {
+                        div.innerHTML = `<div class="text-sm font-black text-slate-400 uppercase">${item.en}</div><div class="flex gap-3"><button onclick="Core.restore(${item.id})" class="text-indigo-500 text-[9px] font-black uppercase">KHÔI PHỤC</button><button onclick="Core.kill(${item.id})" class="text-rose-600 text-[9px] font-black uppercase underline">XÓA HẲN</button></div>`;
+                    } else {
+                        div.innerHTML = `<div class="text-sm font-black text-slate-700 uppercase">${item.en} <span class="text-indigo-400 ml-1 font-bold">/ ${item.vi}</span></div><button onclick="Core.moveToTrash(${item.id})" class="text-slate-400 text-[9px] font-black uppercase">XÓA</button>`;
+                    }
                     list.appendChild(div);
                 });
             },
 
-            del(id) { DB.vocab = DB.vocab.filter(i => i.id !== id); DB.save(); this.search(document.getElementById('v-search')?.value || ''); },
+            moveToTrash(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = true; DB.save(); this.search(document.getElementById('v-search').value); },
+            restore(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = false; DB.save(); this.search(document.getElementById('v-search').value); },
+            kill(id) { DB.vocab = DB.vocab.filter(x => x.id !== id); DB.save(); this.search(document.getElementById('v-search').value); },
 
             renderData(v) {
-                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
+                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ nói: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
             },
 
             updateStreak() {
@@ -243,46 +223,21 @@
                     DB.meta.lastDate = t;
                 }
             },
-            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Backup.json'; a.click(); },
-            
+            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Ultimate.json'; a.click(); },
             import(el) {
                 const r = new FileReader();
                 r.onload = async (e) => {
-                    try {
-                        const d = JSON.parse(e.target.result);
-                        if(!d.v || !d.m) throw new Error();
-
-                        // 1. Map từ hiện có để check trùng nhanh
-                        const currentWords = new Map();
-                        DB.vocab.forEach(item => currentWords.set(item.en.toLowerCase().trim(), item));
-
-                        // 2. Duyệt dữ liệu mới - Áp dụng luật "Giữ lại từ học nhiều hơn" của ông
-                        d.v.forEach(newWord => {
-                            const key = newWord.en.toLowerCase().trim();
-                            if (currentWords.has(key)) {
-                                const oldWord = currentWords.get(key);
-                                // Giữ lại record có reps cao hơn (tiến trình học xa hơn)
-                                if (newWord.reps > oldWord.reps) Object.assign(oldWord, newWord);
-                            } else {
-                                DB.vocab.push(newWord);
-                            }
-                        });
-
-                        // 3. Hợp nhất Meta (Streak max, gộp History cộng dồn)
-                        DB.meta.streak = Math.max(DB.meta.streak, d.m.streak || 0);
-                        for (let date in d.m.history) {
-                            DB.meta.history[date] = (DB.meta.history[date] || 0) + d.m.history[date];
-                        }
-                        const importedDate = d.m.lastDate ? new Date(d.m.lastDate) : new Date(0);
-                        const currentDate = DB.meta.lastDate ? new Date(DB.meta.lastDate) : new Date(0);
-                        DB.meta.lastDate = (currentDate > importedDate) ? DB.meta.lastDate : d.m.lastDate;
-
-                        await DB.save();
-                        alert("Đã hợp nhất thành công! Dữ liệu của ông giờ là vô đối. 🔥");
-                        location.reload(); 
-                    } catch (err) {
-                        alert("File này 'lạ' quá, không gộp được ông ơi! ❌");
-                    }
+                    const d = JSON.parse(e.target.result);
+                    const curMap = new Map();
+                    DB.vocab.forEach(v => curMap.set(v.en.toLowerCase().trim(), v));
+                    d.v.forEach(nv => {
+                        const k = nv.en.toLowerCase().trim();
+                        if(curMap.has(k)) { if(nv.reps > curMap.get(k).reps) Object.assign(curMap.get(k), nv); }
+                        else { DB.vocab.push(nv); }
+                    });
+                    DB.meta.streak = Math.max(DB.meta.streak, d.m.streak || 0);
+                    for (let date in d.m.history) { DB.meta.history[date] = (DB.meta.history[date] || 0) + d.m.history[date]; }
+                    await DB.save(); location.reload();
                 };
                 r.readAsText(el.files[0]);
             }
