@@ -344,32 +344,25 @@
 
 
             add() {
-
                 const en = document.getElementById('in-en')?.value.trim();
-
                 const vi = document.getElementById('in-vi')?.value.trim();
-
                 if(!en || !vi) return;
-
                 DB.vocab.push({ id: Date.now(), en, vi, ipa: window.curInf?.ipa || '', ex: window.curInf?.ex || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
-
                 window.curInf = null; 
-
                 document.getElementById('in-en').value = ''; 
-
                 document.getElementById('in-vi').value = '';
-
                 document.getElementById('in-en').focus(); 
-
                 DB.save();
+                DB.updateUI(); // Thêm dòng này để Header nhảy số ngay
+            },
 
-            },bulkAdd() {
+            bulkAdd() {
                 const area = document.getElementById('bulk');
-                if(!area || !area.value.trim()) return;
+                const val = area?.value.trim();
+                if(!val) return;
 
-                const lines = area.value.split('\n');
+                const lines = val.split('\n');
                 let count = 0;
-
                 lines.forEach(line => {
                     if (line.includes(':')) {
                         const [en, vi] = line.split(':').map(s => s.trim());
@@ -385,13 +378,14 @@
                 });
 
                 if (count > 0) {
-                    area.value = ''; // Lưu xong xoá trắng ô nhập
+                    area.value = '';
+                    window.curInf = null; // Dọn rác bộ nhớ
                     DB.save();
+                    DB.updateUI(); // Cập nhật Mastery % và Units ngay lập tức
                     const info = document.getElementById('nexus-info');
                     if(info) info.innerText = `ĐÃ LƯU THÀNH CÔNG ${count} TỪ!`;
                 }
             },
-
 
 
             // --- KHO LƯU TRỮ (VAULT MODE) ---
@@ -528,34 +522,21 @@
 
         // --- KEYBOARD ENGINE (Bộ não phím tắt) ---
         window.onkeydown = (e) => {
-            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
-                // Nhấn Enter ở ô input đơn (in-en)
-                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
-
-                // MỚI: Nhấn Enter ở ô nhập nhanh (textarea id="bulk")
-                if (e.key === 'Enter' && e.target.id === 'bulk' && !e.shiftKey) {
-                    e.preventDefault();
-                    const lines = e.target.value.split('\n');
-                    lines.forEach(line => {
-                        if (line.includes(':')) {
-                            const [en, vi] = line.split(':').map(s => s.trim());
-                            if (en && vi) {
-                                DB.vocab.push({ 
-                                    id: Date.now() + Math.random(), 
-                                    en, vi, ipa: '', ex: '', 
-                                    reps: 0, ef: 2.5, interval: 0, next: Date.now() 
-                                });
-                            }
-                        }
-                    });
-                    e.target.value = ''; // Xóa sạch ô nhập sau khi lưu
-                    DB.save();
-                    if(document.getElementById('nexus-info')) 
-                        document.getElementById('nexus-info').innerText = "ĐÃ LƯU DỮ LIỆU NHẬP NHANH!";
+            const target = e.target;
+            
+            // Xử lý khi đang gõ trong ô nhập
+            if (['INPUT', 'TEXTAREA'].includes(target.tagName)) {
+                if (e.key === 'Enter') {
+                    if (target.id === 'in-en') Core.add(); // Nhập lẻ
+                    if (target.id === 'bulk' && !e.shiftKey) { // Nhập nhanh
+                        e.preventDefault(); 
+                        Core.bulkAdd(); 
+                    }
                 }
                 return;
             }
 
+            // Phím tắt điều hướng và học tập
             const key = e.key.toLowerCase();
             if (key === 's') Core.route('study');
             if (key === 'n') Core.route('nexus');
@@ -564,12 +545,13 @@
             if (Core.state.view === 'study' && Core.state.queue.length > 0) {
                 if (e.code === 'Space' || key === 'f') { e.preventDefault(); Core.flip(); }
                 if (Core.state.flipped) {
-                    if (key === '1') Core.ans(0); if (key === '2') Core.ans(1);
-                    if (key === '3') Core.ans(3); if (key === '4') Core.ans(5);
+                    if (key === '1') Core.ans(0); 
+                    if (key === '2') Core.ans(1);
+                    if (key === '3') Core.ans(3); 
+                    if (key === '4') Core.ans(5);
                 }
             }
         };
-
         // Khởi động
         Core.route('study');
     </script>
