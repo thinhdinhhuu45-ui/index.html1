@@ -113,7 +113,7 @@
             getPosTag(vi) {
                 const map = { '(n)': 'bg-blue-100 text-blue-600', '(v)': 'bg-green-100 text-green-600', '(adj)': 'bg-orange-100 text-orange-600', '(adv)': 'bg-purple-100 text-purple-600' };
                 for (let key in map) {
-                    if (vi.toLowerCase().includes(key)) return `<span class="ml-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${map[key]}">${key.replace('(','').replace(')','')}</span>`;
+                    if (vi.toLowerCase().includes(key)) return `<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${map[key]}">${key.replace('(','').replace(')','')}</span>`;
                 }
                 return '';
             },
@@ -158,10 +158,11 @@
                                 <p class="text-slate-400 font-mono text-sm tracking-widest">${item.ipa||''}</p>
                             </div>
                             <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
-                                <h2 class="text-3xl font-bold text-indigo-600 tracking-tight">
-                                    ${item.vi.replace(/\(n\)|\(v\)|\(adj\)|\(adv\)/gi, '')} 
-                                    ${this.getPosTag(item.vi)}
+                                <div class="mb-2">${this.getPosTag(item.vi)}</div>
+                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight px-4 leading-tight">
+                                    ${item.vi.replace(/\(n\)|\(v\)|\(adj\)|\(adv\)/gi, '').trim()}
                                 </h2>
+                                <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
                             </div>
                         </div>
                         <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none">
@@ -196,15 +197,14 @@
                 const delay = (q === 0) ? 600000 : (i * (0.95 + Math.random() * 0.1)) * 86400000;
                 Object.assign(item, { reps, ef, interval: i, next: Date.now() + delay });
                 
-                // Track history
                 const today = new Date().toDateString();
                 DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
                 
                 this.updateStreak(); this.route('study');
             },
 
-            renderNexus(v) {
-                v.innerHTML = `
+            renderNexus(port) {
+                port.innerHTML = `
                     <div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4">
                         <input id="in-en" autocomplete="off" placeholder="TỪ TIẾNG ANH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter">
                         <input id="in-vi" autocomplete="off" placeholder="NGHĨA CỦA TỪ..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg">
@@ -251,11 +251,8 @@
                 const vi = document.getElementById('in-vi')?.value.trim();
                 if(!en || !vi) return;
                 DB.vocab.push({ id: Date.now(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now() });
-                
-                // Track activity in heatmap immediately
                 const today = new Date().toDateString();
                 DB.meta.history[today] = (DB.meta.history[today] || 0) + 1;
-                
                 this.speak(en);
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = '';
                 document.getElementById('in-en').focus(); DB.save(); DB.updateUI(); this.updateRank();
@@ -291,7 +288,7 @@
                 const query = q.toLowerCase();
                 list.innerHTML = DB.vocab.filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query)).slice().reverse().map(i => `
                     <div class="flex justify-between items-center p-4 bg-white border border-slate-50 rounded-xl shadow-sm">
-                        <div class="text-sm font-black text-slate-700 uppercase tracking-tighter">${i.en} <span class="text-indigo-400 ml-1 font-bold lowercase">/ ${i.vi}</span> ${this.getPosTag(i.vi)}</div>
+                        <div class="text-sm font-black text-slate-700 uppercase tracking-tighter">${i.en} <span class="text-indigo-400 ml-1 font-bold lowercase">/ ${i.vi}</span></div>
                         <button onclick="Core.del(${i.id})" class="text-rose-400 text-[9px] font-black uppercase tracking-widest">XÓA</button>
                     </div>`).join('');
             },
