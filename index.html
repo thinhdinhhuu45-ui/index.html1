@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KP v-PRO MAX | ULTIMATE EDITION</title>
+    <title>KP v-PRO MAX | PERFORMANCE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #0f172a; overflow: hidden; }
@@ -13,6 +13,7 @@
         .heat-cell { height: 8px; border-radius: 1px; background: #e2e8f0; }
         .hidden { display: none !important; }
         .custom-scroll::-webkit-scrollbar { display: none; }
+        .input-focus:focus { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
     </style>
 </head>
 <body class="flex justify-center p-2 sm:p-4">
@@ -21,7 +22,7 @@
             <div class="flex flex-col">
                 <div class="flex items-center gap-2">
                     <span class="font-black text-orange-500 text-lg">🔥 <span id="streak">0</span></span>
-                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">PRO MAX</span>
+                    <span id="rank-tag" class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm bg-slate-100 text-slate-500">PERFORMANCE</span>
                 </div>
                 <div id="mastery" class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">MASTERED: 0%</div>
             </div>
@@ -42,9 +43,7 @@
         const DB = {
             vocab: [],
             meta: { streak: 0, lastDate: null, history: {}, speechRate: 0.9 },
-            cache: new Map(),
-            timer: null,
-            
+            cache: new Map(), timer: null,
             async init() {
                 return new Promise((resolve) => {
                     const request = indexedDB.open("KP_PRO_MAX", 1);
@@ -54,19 +53,16 @@
                         const store = this.idb.transaction("store", "readonly").objectStore("store");
                         const v = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
                         const m = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
-                        if (v) this.vocab = v; if (m) this.meta = m;
-                        resolve();
+                        if (v) this.vocab = v; if (m) this.meta = m; resolve();
                     };
                 });
             },
-
             async save() {
                 const tx = this.idb.transaction("store", "readwrite");
                 tx.objectStore("store").put(this.vocab, "vocab");
                 tx.objectStore("store").put(this.meta, "meta");
                 this.updateUI();
             },
-
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
                 const active = this.vocab.filter(i => !i.trash);
@@ -87,14 +83,12 @@
 
         const Core = {
             state: { view: '', flipped: false, queue: [], isTrashView: false },
-            
             speak(txt) {
                 window.speechSynthesis.cancel();
                 const msg = new SpeechSynthesisUtterance(txt);
                 msg.lang = 'en-US'; msg.rate = DB.meta.speechRate || 0.9;
                 window.speechSynthesis.speak(msg);
             },
-
             route(v) {
                 this.state.view = v; this.state.flipped = false; this.state.isTrashView = false;
                 document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
@@ -105,7 +99,6 @@
                 else if (v === 'vault') this.renderVault(port);
                 else if (v === 'data') this.renderData(port);
             },
-
             renderStudy(v) {
                 this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
                 if(!this.state.queue.length) {
@@ -113,21 +106,62 @@
                     return;
                 }
                 const item = this.state.queue[0];
-                v.innerHTML = `<div class="h-full flex flex-col"><div class="relative cursor-pointer" onclick="Core.flip()"><div id="card-front" class="card-side shadow-sm p-6 text-center"><h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2></div><div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20"><h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2><p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p></div></div><div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity"><button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN [1]</button><button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD [2]</button><button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD [3]</button><button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button></div></div>`;
-            },
+                const needsTyping = item.reps < 2; // Yêu cầu gõ nếu từ mới hoặc mới học lại
 
+                v.innerHTML = `
+                    <div class="h-full flex flex-col">
+                        <div class="relative cursor-pointer" onclick="Core.flip()">
+                            <div id="card-front" class="card-side shadow-sm p-6 text-center">
+                                <h2 class="text-5xl font-black mb-3 tracking-tighter uppercase text-slate-800">${item.en}</h2>
+                                ${needsTyping ? '<div class="mt-4 px-3 py-1 bg-amber-50 text-amber-600 text-[8px] font-black rounded-full">ACTIVE RECALL MODE</div>' : ''}
+                            </div>
+                            <div id="card-back" class="card-side shadow-sm p-6 text-center hidden border-indigo-200 bg-indigo-50/20">
+                                <h2 class="text-3xl font-black text-indigo-600 tracking-tight leading-tight">${item.vi}</h2>
+                                <p class="text-indigo-300 font-mono text-xs mt-4 tracking-wider">${item.ipa||''}</p>
+                                ${needsTyping ? `
+                                    <input id="recall-input" autocomplete="off" placeholder="Gõ lại từ để xác nhận..." 
+                                    class="mt-6 w-full max-w-[200px] p-2 border-b-2 border-indigo-200 bg-transparent outline-none text-center font-black uppercase text-indigo-600 focus:border-indigo-500">
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div id="study-controls" class="grid grid-cols-4 gap-1.5 mt-2 opacity-20 pointer-events-none transition-opacity">
+                            <button onclick="Core.ans(0)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">AGAIN [1]</button>
+                            <button onclick="Core.ans(1)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">HARD [2]</button>
+                            <button onclick="Core.ans(3)" class="bg-white border-2 border-slate-100 py-4 font-black text-[10px] rounded-xl">GOOD [3]</button>
+                            <button onclick="Core.ans(5)" class="bg-indigo-600 text-white py-4 font-black text-[10px] rounded-xl shadow-lg">EASY [4]</button>
+                        </div>
+                    </div>`;
+                
+                if (needsTyping) {
+                    setTimeout(() => {
+                        const inp = document.getElementById('recall-input');
+                        if (inp) inp.addEventListener('input', (e) => {
+                            if (e.target.value.toLowerCase().trim() === item.en.toLowerCase().trim()) {
+                                e.target.classList.replace('text-indigo-600', 'text-green-500');
+                                e.target.disabled = true;
+                            }
+                        });
+                    }, 100);
+                }
+            },
             flip() {
                 if (this.state.view !== 'study' || !this.state.queue.length) return;
                 this.state.flipped = !this.state.flipped;
                 document.getElementById('card-front').classList.toggle('hidden', this.state.flipped);
                 document.getElementById('card-back').classList.toggle('hidden', !this.state.flipped);
                 document.getElementById('study-controls')?.classList.remove('opacity-20', 'pointer-events-none');
-                if(this.state.flipped) this.speak(this.state.queue[0].en);
+                if(this.state.flipped) {
+                    this.speak(this.state.queue[0].en);
+                    const inp = document.getElementById('recall-input');
+                    if (inp) inp.focus();
+                }
             },
-
             ans(q) {
                 if(!this.state.flipped) return;
                 const item = this.state.queue[0];
+                const inp = document.getElementById('recall-input');
+                if (inp && !inp.disabled && q > 0) return; // Bắt buộc gõ đúng nếu không chọn Again
+
                 let { reps, ef, interval: i } = item;
                 if (q >= 3) { if (reps === 0) i = 1; else if (reps === 1) i = 4; else i = Math.round(i * ef); reps++; }
                 else { reps = 0; i = 1; }
@@ -137,7 +171,6 @@
                 const d = new Date().toDateString(); DB.meta.history[d] = (DB.meta.history[d]||0)+1;
                 this.updateStreak(); DB.save(); this.route('study');
             },
-
             renderNexus(port) {
                 port.innerHTML = `<div class="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col gap-4"><input id="in-en" autocomplete="off" placeholder="ENGLISH..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-black text-2xl uppercase tracking-tighter"><input id="in-vi" autocomplete="off" placeholder="NGHĨA..." class="w-full p-4 border-2 border-slate-100 rounded-xl outline-none focus:border-indigo-500 font-bold text-indigo-600 text-lg"><div id="nexus-info" class="text-[10px] text-slate-300 font-bold uppercase tracking-widest ml-1 italic">Tự động tra cứu...</div><button onclick="Core.add()" class="bg-slate-900 text-white py-4.5 rounded-xl font-black uppercase text-xs tracking-widest active:scale-95">LƯU [ENTER]</button></div>`;
                 const en = document.getElementById('in-en'); en.focus();
@@ -166,7 +199,6 @@
                     }, 450);
                 };
             },
-
             add() {
                 const en = document.getElementById('in-en')?.value.trim();
                 const vi = document.getElementById('in-vi')?.value.trim();
@@ -174,12 +206,10 @@
                 DB.vocab.push({ id: Date.now() + Math.random(), en, vi, ipa: window.curInf?.ipa || '', reps: 0, ef: 2.5, interval: 0, next: Date.now(), trash: false });
                 DB.save(); this.speak(en); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
             },
-
             renderVault(v) {
                 v.innerHTML = `<div class="flex gap-2 mb-2"><input id="v-search" oninput="Core.search(this.value)" placeholder="TÌM KIẾM..." class="flex-grow p-4 border-2 border-slate-100 rounded-xl outline-none text-sm font-bold shadow-sm"><button onclick="Core.toggleTrash()" id="trash-btn" class="px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]">THÙNG RÁC</button></div><div id="v-list" class="overflow-y-auto max-h-[65vh] custom-scroll flex flex-col gap-1.5"></div>`;
                 this.search('');
             },
-
             toggleTrash() {
                 this.state.isTrashView = !this.state.isTrashView;
                 const btn = document.getElementById('trash-btn');
@@ -187,7 +217,6 @@
                 btn.className = this.state.isTrashView ? "px-4 bg-orange-500 text-white rounded-xl font-black text-[10px]" : "px-4 bg-slate-100 text-slate-500 rounded-xl font-black text-[10px]";
                 this.search(document.getElementById('v-search').value);
             },
-
             search(q) {
                 const list = document.getElementById('v-list'); list.innerHTML = '';
                 const query = q.toLowerCase().trim();
@@ -206,15 +235,12 @@
                     list.appendChild(div);
                 });
             },
-
             moveToTrash(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = true; DB.save(); this.search(document.getElementById('v-search').value); },
             restore(id) { const i = DB.vocab.find(x => x.id === id); if(i) i.trash = false; DB.save(); this.search(document.getElementById('v-search').value); },
             kill(id) { DB.vocab = DB.vocab.filter(x => x.id !== id); DB.save(); this.search(document.getElementById('v-search').value); },
-
             renderData(v) {
-                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ nói: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
+                v.innerHTML = `<div class="bg-white p-8 rounded-2xl flex flex-col gap-6 border border-slate-100"><div class="p-4 bg-slate-50 rounded-xl"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-3 text-center">Tốc độ: <span id="r-v" class="text-indigo-600">${DB.meta.speechRate}</span>X</label><input type="range" min="0.5" max="1.5" step="0.1" value="${DB.meta.speechRate}" class="w-full accent-indigo-600" oninput="DB.meta.speechRate=parseFloat(this.value);document.getElementById('r-v').innerText=this.value;DB.save()"></div><div class="grid grid-cols-2 gap-2"><button onclick="Core.export()" class="py-4 bg-indigo-50 text-indigo-600 font-black rounded-xl text-[10px] uppercase">Xuất file</button><button onclick="document.getElementById('imp').click()" class="py-4 bg-slate-50 text-slate-600 font-black rounded-xl text-[10px] uppercase">Nhập file</button></div><input type="file" id="imp" onchange="Core.import(this)" class="hidden"></div>`;
             },
-
             updateStreak() {
                 const t = new Date().toDateString();
                 if(DB.meta.lastDate !== t) {
@@ -223,7 +249,7 @@
                     DB.meta.lastDate = t;
                 }
             },
-            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Ultimate.json'; a.click(); },
+            export() { const b = new Blob([JSON.stringify({v: DB.vocab, m: DB.meta})], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'KP_Performance.json'; a.click(); },
             import(el) {
                 const r = new FileReader();
                 r.onload = async (e) => {
@@ -246,7 +272,7 @@
         window.onkeydown = (e) => {
             const isIn = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
             const k = e.key.toLowerCase();
-            if (isIn) { if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); return; }
+            if (isIn && e.target.id !== 'recall-input') { if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); return; }
             if (['a','s','d','f'].includes(k)) { 
                 e.preventDefault(); 
                 if(k==='a') Core.route('study'); if(k==='s') Core.route('nexus'); if(k==='d') Core.route('vault'); if(k==='f') Core.route('data'); 
