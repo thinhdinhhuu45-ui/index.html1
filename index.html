@@ -68,21 +68,25 @@
                 const store = this.idb.transaction("store", "readwrite").objectStore("store");
                 const savedVocab = await new Promise(r => store.get("vocab").onsuccess = e => r(e.target.result));
                 const savedMeta = await new Promise(r => store.get("meta").onsuccess = e => r(e.target.result));
-                this.vocab = savedVocab || [];
-                this.meta = savedMeta || { streak: 0, lastDate: null, history: {}, speechRate: 0.9 };
+                const backup = JSON.parse(localStorage.getItem('KP_BACKUP') || 'null');
+
+                if (!savedVocab && backup) {
+                    this.vocab = backup.v || [];
+                    this.meta = backup.m || { streak: 0, lastDate: null, history: {}, speechRate: 0.9 };
+                } else {
+                    this.vocab = savedVocab || [];
+                    this.meta = savedMeta || { streak: 0, lastDate: null, history: {}, speechRate: 0.9 };
+                }
             },
 
             async save() {
-    const tx = this.idb.transaction("store", "readwrite");
-    tx.objectStore("store").put(this.vocab, "vocab");
-    tx.objectStore("store").put(this.meta, "meta");
-    
-    // Bản dự phòng siêu tốc - cứu cánh khi hệ thống chính gặp sự cố
-    localStorage.setItem('KP_BACKUP', JSON.stringify({v: this.vocab, m: this.meta}));
-    
-    this.rebuildIndex();
-    this.updateUI();
-},
+                const tx = this.idb.transaction("store", "readwrite");
+                tx.objectStore("store").put(this.vocab, "vocab");
+                tx.objectStore("store").put(this.meta, "meta");
+                localStorage.setItem('KP_BACKUP', JSON.stringify({v: this.vocab, m: this.meta}));
+                this.rebuildIndex();
+                this.updateUI();
+            },
 
             rebuildIndex() {
                 this.index.clear();
@@ -208,16 +212,22 @@
                     DB.timer = setTimeout(async () => {
                         try {
                             const [t, i] = await Promise.all([
-                                fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&q=${val}`).then(r => r.json()),
+                                fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=vi&dt=t&dt=bd&dt=at&dt=ss&q=${val}`).then(r => r.json()),
                                 fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`).then(r => r.json()).catch(() => null)
                             ]);
-                            const viMean = t?.[0]?.[0]?.[0]?.toLowerCase() || '';
+                            let mainMean = t?.[0]?.[0]?.[0] || '';
+                            let extraMeans = [];
+                            if (t?.[1]) t[1].forEach(pos => { if (pos[1]) extraMeans.push(...pos[1].slice(0, 2)); });
+                            let combined = [mainMean, ...extraMeans];
+                            let uniqueMeans = [...new Set(combined.map(s => s.toLowerCase().trim()))].slice(0, 3);
+                            let finalVi = uniqueMeans.join(', ');
                             const entry = i?.[0];
-                            let pos = entry?.meanings[0]?.partOfSpeech.toLowerCase() || '';
-                            let tag = pos.includes('noun')?' (n)':pos.includes('verb')?' (v)':pos.includes('adj')?' (adj)':pos.includes('adv')?' (adv)':'';
+                            let posTag = entry?.meanings[0]?.partOfSpeech.toLowerCase() || '';
+                            let tag = posTag.includes('noun')?' (n)':posTag.includes('verb')?' (v)':posTag.includes('adj')?' (adj)':posTag.includes('adv')?' (adv)':'';
                             const ipa = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
-                            DB.cache.set(val, { vi: viMean + tag, ipa });
-                            document.getElementById('in-vi').value = viMean + tag;
+                            const resultText = finalVi + tag;
+                            DB.cache.set(val, { vi: resultText, ipa });
+                            document.getElementById('in-vi').value = resultText;
                             document.getElementById('nexus-info').innerText = 'IPA: ' + (ipa || 'N/A');
                             window.curInf = { ipa };
                         } catch(e) {}
@@ -253,9 +263,8 @@
                 let source = DB.vocab;
                 if (query.length > 0) {
                     const firstChar = query[0];
-                    if (DB.index.has(firstChar)) {
-                        source = DB.index.get(firstChar).filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query));
-                    } else { source = []; }
+                    if (DB.index.has(firstChar)) source = DB.index.get(firstChar).filter(i => i.en.toLowerCase().includes(query) || i.vi.includes(query));
+                    else source = [];
                 }
                 const data = [...source].reverse();
                 const observer = new IntersectionObserver((entries) => {
@@ -302,34 +311,27 @@
             import(el) { const r = new FileReader(); r.onload = async (e) => { const d = JSON.parse(e.target.result); DB.vocab = d.v; DB.meta = d.m; await DB.save(); location.reload(); }; r.readAsText(el.files[0]); }
         };
 
-        // --- HỆ THỐNG PHÍM TẮT ĐÃ ĐƯỢC FIX CỰC ĐOAN ---
+        // --- HỆ THỐNG PHÍM TẮT THÔNG MINH (CHỈ CHẠY KHI KHÔNG NHẬP LIỆU) ---
         window.onkeydown = (e) => {
-            const k = e.key.toLowerCase();
             const isInput = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+            const k = e.key.toLowerCase();
 
-            // Xử lý phím tắt chuyển tab A S D F (Ngay cả khi đang focus vào input)
-            if (['a', 's', 'd', 'f'].includes(k)) {
-                // Nếu đang ở ô nhập, nhưng nhấn phím chuyển tab khác mục hiện tại -> Cho phép nhảy
-                // Ví dụ: Đang ở Nexus (S) và focus input, nhấn A -> Nhảy sang Study
-                const currentMap = { 'study':'a', 'nexus':'s', 'vault':'d', 'data':'f' };
-                if (k !== currentMap[Core.state.view]) {
-                    e.preventDefault(); 
-                    if(isInput) e.target.blur(); // Thoát khỏi ô nhập để không bị dính chữ
-                    if (k === 'a') Core.route('study');
-                    if (k === 's') Core.route('nexus');
-                    if (k === 'd') Core.route('vault');
-                    if (k === 'f') Core.route('data');
-                    return;
-                }
-            }
-
-            // Nếu đang trong Input và không phải phím chuyển tab -> Chỉ xử lý Enter để Add
-            if (isInput) { 
-                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add(); 
+            // 1. NẾU ĐANG GÕ CHỮ (FOCUS VÀO Ô NHẬP): Cho phép gõ thoải mái, trừ phím Enter để lưu
+            if (isInput) {
+                if (e.key === 'Enter' && e.target.id === 'in-en') Core.add();
+                // Không chặn bất kỳ phím nào khác để ông gõ a s d f bình thường
                 return; 
             }
 
-            // Logic phím tắt khi học (Study Mode)
+            // 2. NẾU KHÔNG FOCUS VÀO Ô NHẬP: Kích hoạt phím tắt chuyển Tab và Học tập
+            if (['a', 's', 'd', 'f'].includes(k)) {
+                e.preventDefault();
+                if (k === 'a') Core.route('study');
+                if (k === 's') Core.route('nexus');
+                if (k === 'd') Core.route('vault');
+                if (k === 'f') Core.route('data');
+            }
+
             if (Core.state.view === 'study' && Core.state.queue.length > 0) {
                 if (e.code === 'Space') { e.preventDefault(); Core.flip(); }
                 if (Core.state.flipped) { 
