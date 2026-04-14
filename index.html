@@ -44,7 +44,6 @@
     </div>
 
     <script>
-        // 1. LÕI FSRS v5 - 19 WEIGHTS CHUẨN QUỐC TẾ
         const W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
         
         const Sfx = {
@@ -94,83 +93,138 @@
         };
 
         const Core = {
-            state: { view: '', queue: [], initialQueueSize: 0, flipped: false, trash: false },
+            state: { view: '', queue: [], initialQueueSize: 0, flipped: false, utterance: null },
+            
             route(v) {
-                this.state.view = v; this.state.flipped = false;
+                this.state.view = v;
                 document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
-                const port = document.getElementById('view'); port.innerHTML = '';
-                if(v === 'study') this.renderStudy(port);
-                else if(v === 'nexus') this.renderNexus(port);
-                else if(v === 'vault') this.renderVault(port);
-                else if(v === 'data') this.renderData(port);
-            },
-            renderStudy(v) {
-                if(!this.state.queue.length) {
+                const port = document.getElementById('view');
+                
+                if(v === 'study') {
                     this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
                     this.state.initialQueueSize = this.state.queue.length;
+                    this.renderStudyFrame(port);
+                    this.nextCard();
+                } else {
+                    port.innerHTML = '';
+                    if(v === 'nexus') this.renderNexus(port);
+                    else if(v === 'vault') this.renderVault(port);
+                    else if(v === 'data') this.renderData(port);
                 }
-                const progress = document.getElementById('progress');
-                if (this.state.initialQueueSize > 0) {
-                    const doneCount = this.state.initialQueueSize - this.state.queue.length;
-                    progress.style.width = `${(doneCount / this.state.initialQueueSize) * 100}%`;
-                } else { progress.style.width = '100%'; }
+            },
 
-                if(!this.state.queue.length) {
-                    v.innerHTML = `<div class="card-side border-dashed border-zinc-800 text-[10px] font-black uppercase text-zinc-600 italic">Target Cleared.</div>`;
-                    this.state.initialQueueSize = 0; return;
-                }
-                
-                const item = this.state.queue[0];
+            renderStudyFrame(v) {
                 v.innerHTML = `
-                    <div class="h-full flex flex-col">
+                    <div id="study-container" class="h-full flex flex-col">
                         <div class="relative cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
-                            <div id="cf" class="card-side bg-zinc-900 p-8 text-center flex-grow ${item.failCount >= 5 ? 'leech-card' : ''}">
-                                <h2 class="text-5xl font-black tracking-tighter uppercase text-zinc-100">${item.en}</h2>
-                                ${item.failCount >= 5 ? '<p class="text-[8px] text-red-500 font-bold mt-4 tracking-[0.2em]">STUBBORN WORD</p>' : ''}
+                            <div id="cf" class="card-side bg-zinc-900 p-8 text-center flex-grow">
+                                <h2 id="en-disp" class="text-5xl font-black tracking-tighter uppercase text-zinc-100"></h2>
+                                <p id="leech-tag" class="text-[8px] text-red-500 font-bold mt-4 tracking-[0.2em] hidden">STUBBORN WORD</p>
                             </div>
                             <div id="cb" class="card-side p-8 text-center flex-grow hidden bg-zinc-900 border-teal-500/10">
-                                <h2 class="text-4xl font-black text-teal-400">${item.vi}</h2>
+                                <h2 id="vi-disp" class="text-4xl font-black text-teal-400"></h2>
                             </div>
                         </div>
-                        <div id="ctrl" class="grid grid-cols-2 gap-3 mt-3 opacity-10 pointer-events-none">
-                            <button onclick="Core.ans(false)" class="bg-zinc-900 border border-red-900/30 py-8 rounded-3xl text-xs font-black text-red-500 uppercase active:scale-95 transition-transform">FAIL [1]</button>
-                            <button onclick="Core.ans(true)" class="bg-zinc-900 border border-teal-900/30 py-8 rounded-3xl text-xs font-black text-teal-500 uppercase active:scale-95 transition-transform">PASS [2]</button>
+                        <div id="ctrl" class="grid grid-cols-2 gap-3 mt-3 opacity-10 pointer-events-none transition-opacity duration-75">
+                            <button onclick="Core.ans(false)" class="bg-zinc-900 border border-red-900/30 py-8 rounded-3xl text-xs font-black text-red-500 uppercase active:scale-95">FAIL [1]</button>
+                            <button onclick="Core.ans(true)" class="bg-zinc-900 border border-teal-900/30 py-8 rounded-3xl text-xs font-black text-teal-500 uppercase active:scale-95">PASS [2]</button>
                         </div>
-                    </div>`;
+                    </div>
+                    <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black uppercase text-zinc-600 italic">Target Cleared.</div>`;
             },
+
+            nextCard() {
+                const progress = document.getElementById('progress');
+                const container = document.getElementById('study-container');
+                const empty = document.getElementById('empty-msg');
+
+                if(!this.state.queue.length) {
+                    if(container) container.classList.add('hidden');
+                    if(empty) empty.classList.remove('hidden');
+                    progress.style.width = '100%';
+                    return;
+                }
+
+                if(container) container.classList.remove('hidden');
+                if(empty) empty.classList.add('hidden');
+
+                const qItem = this.state.queue[0];
+                const dbItem = qItem.ref || qItem; 
+                this.state.flipped = false;
+
+                document.getElementById('en-disp').innerText = dbItem.en;
+                document.getElementById('vi-disp').innerText = dbItem.vi;
+                document.getElementById('cf').classList.remove('hidden', 'leech-card');
+                document.getElementById('cb').classList.add('hidden');
+                document.getElementById('ctrl').classList.add('opacity-10', 'pointer-events-none');
+                
+                if(dbItem.failCount >= 5) {
+                    document.getElementById('cf').classList.add('leech-card');
+                    document.getElementById('leech-tag').classList.remove('hidden');
+                } else {
+                    document.getElementById('leech-tag').classList.add('hidden');
+                }
+
+                this.state.utterance = new SpeechSynthesisUtterance(dbItem.en);
+                this.state.utterance.rate = DB.meta.speechRate;
+
+                const uniqueCardsLeft = new Set(this.state.queue.map(x => (x.ref || x).id)).size;
+                const doneCount = Math.max(0, this.state.initialQueueSize - uniqueCardsLeft);
+                progress.style.width = `${(doneCount / this.state.initialQueueSize) * 100}%`;
+            },
+
             flip() {
                 if(this.state.view !== 'study' || !this.state.queue.length || this.state.flipped) return;
-                Sfx.init(); this.state.flipped = true;
+                Sfx.init();
+                this.state.flipped = true;
                 document.getElementById('cf').classList.add('hidden');
                 document.getElementById('cb').classList.remove('hidden');
                 document.getElementById('ctrl').classList.remove('opacity-10', 'pointer-events-none');
-                const item = this.state.queue[0];
+                
                 window.speechSynthesis.cancel();
-                const m = new SpeechSynthesisUtterance(item.en); m.rate = DB.meta.speechRate;
-                window.speechSynthesis.speak(m);
+                window.speechSynthesis.speak(this.state.utterance);
             },
+
             ans(isPass) {
                 if(!this.state.flipped) return;
-                const item = this.state.queue.shift();
+                const qItem = this.state.queue.shift();
+                const dbItem = qItem.ref || qItem;
+                
                 if(!isPass) {
                     Sfx.fail();
-                    item.failCount = (item.failCount || 0) + 1;
-                    this.processFSRS(item, 1);
-                    this.state.queue.push(item);
+                    dbItem.failCount = (dbItem.failCount || 0) + 1;
+                    this.processFSRS(dbItem, 1);
+                    
+                    // Reset 3-5-7 Requeue: Xóa mọi checkpoint hiện có của card này trong queue
+                    this.state.queue = this.state.queue.filter(x => (x.ref || x).id !== dbItem.id);
+                    
+                    // Force-Inject nợ vào các trạm số 3, 5, 7 (Index tương ứng 2, 4, 6 sau khi queue bị shift)
+                    const d3 = { ...dbItem, isDebt: true, ref: dbItem };
+                    const d5 = { ...dbItem, isDebt: true, ref: dbItem };
+                    const d7 = { ...dbItem, isDebt: true, ref: dbItem };
+                    
+                    this.state.queue.splice(Math.min(2, this.state.queue.length), 0, d3);
+                    this.state.queue.splice(Math.min(4, this.state.queue.length), 0, d5);
+                    this.state.queue.splice(Math.min(6, this.state.queue.length), 0, d7);
                 } else {
                     Sfx.pass();
-                    item.failCount = 0;
-                    this.processFSRS(item, 3);
-                    const ds = new Date().toDateString();
-                    if(DB.meta.lastDate !== ds) {
-                        const l = new Date(DB.meta.lastDate);
-                        DB.meta.streak = (new Date()-l < 151200000) ? DB.meta.streak+1 : 1;
-                        DB.meta.lastDate = ds;
+                    if(!qItem.isDebt) {
+                        dbItem.failCount = 0;
+                        this.processFSRS(dbItem, 3);
+                        const ds = new Date().toDateString();
+                        if(DB.meta.lastDate !== ds) {
+                            const l = new Date(DB.meta.lastDate);
+                            DB.meta.streak = (new Date()-l < 151200000) ? DB.meta.streak+1 : 1;
+                            DB.meta.lastDate = ds;
+                        }
                     }
+                    // Nếu là card isDebt được Pass -> Không xử lý FSRS, tự động tiêu biến khỏi Queue.
                 }
-                DB.save(); this.route('study');
+                
+                DB.save(); // Chạy ngầm Async, không block UI
+                this.nextCard(); // Zero-Latency load thẻ tiếp theo
             },
-            // 2. LOGIC ÉP XUNG FSRS v5 - TINH CHỈNH THEO DỮ LIỆU THỜI GIAN THỰC
+
             processFSRS(item, g) {
                 let { s, d, reps, laps, lastReview } = item;
                 const now = Date.now();
@@ -178,14 +232,15 @@
 
                 if (!reps || reps === 0) {
                     s = W[g-1];
-                    d = W[4] - (g-3)*W[5];
+                    d = W[4] - (g-3)*W[5]; 
                     reps = 0; laps = 0;
                 } else {
                     const r = Math.exp(Math.log(0.9) * (t / s));
                     d = Math.min(10, Math.max(1, d - W[6]*(g-3)));
-                    d = W[4] - W[5]*(g-3) + (d - W[4])*W[7];
+                    d = W[4] + (d - W[4])*W[7];
                     
                     if(g === 1) {
+                        // FSRS v5 Again Penalty (DSR Model) - Residual Memory Lock
                         s = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r));
                         laps++;
                     } else {
@@ -194,18 +249,20 @@
                 }
                 reps++;
                 item.lastReview = now;
+                
+                // R = 0.9 => I = S. Cấu trúc logic chốt chặt Output
                 let ivl = s / Math.log(0.9) * Math.log(DB.meta.retention || 0.9);
                 ivl = Math.max(1, Math.round(ivl));
                 
-                // FUZZING TRÁNH CLUMPING
                 if (ivl > 2) {
                     const f = ivl * 0.05;
                     ivl = Math.round(ivl + (Math.random() * f * 2 - f));
                 }
-                if(g === 1) ivl = 0; // Để học lại ngay trong phiên hoặc ngày mai tùy queue
-
+                if(g === 1) ivl = 0;
+                
                 Object.assign(item, { s, d, reps, laps, interval: ivl, next: now + (g === 1 ? 0 : ivl * 86400000) });
             },
+
             renderNexus(p) {
                 p.innerHTML = `
                 <div class="h-full flex flex-col gap-3">
