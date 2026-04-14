@@ -8,10 +8,8 @@
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #000; color: #d4d4d8; overflow: hidden; }
         .tab-active { background: #14b8a6 !important; color: #000 !important; font-weight: 900 !important; }
-        /* Tối ưu UI cho cả mobile và web, không để mờ tịt nữa để tránh lỗi mobile */
         header, nav { opacity: 0.3; transition: opacity 0.3s ease; }
         header:hover, nav:hover, header:focus-within, nav:focus-within { opacity: 1; }
-        
         .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; border-radius: 32px; width: 100%; border: 1px solid #14b8a611; transition: all 0.1s ease-out; }
         .leech-card { border: 1px solid #ef444433 !important; }
         .progress-bar { position: fixed; bottom: 0; left: 0; height: 3px; background: linear-gradient(90deg, #14b8a6, #3b82f6); transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; }
@@ -38,14 +36,15 @@
         <main id="view" class="flex-grow relative"></main>
 
         <nav class="mt-3 grid grid-cols-4 gap-2">
-            <button onclick="Core.route('study')" id="n-study" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase text-zinc-400 hover:bg-zinc-800 transition">Study</button>
+            <button onclick="Core.route('study')" id="n-study" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase hover:bg-zinc-800 transition">Study</button>
             <button onclick="Core.route('nexus')" id="n-nexus" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase hover:bg-zinc-800 transition">Nexus</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase text-zinc-400 hover:bg-zinc-800 transition">Vault</button>
+            <button onclick="Core.route('vault')" id="n-vault" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase hover:bg-zinc-800 transition">Vault</button>
             <button onclick="Core.route('data')" id="n-data" class="bg-zinc-900 border border-zinc-800 py-4 rounded-2xl font-bold text-zinc-500 text-[10px] uppercase hover:bg-zinc-800 transition">Data</button>
         </nav>
     </div>
 
     <script>
+        // 1. LÕI FSRS v5 - 19 WEIGHTS CHUẨN QUỐC TẾ
         const W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
         
         const Sfx = {
@@ -106,25 +105,19 @@
                 else if(v === 'data') this.renderData(port);
             },
             renderStudy(v) {
-                // Khởi tạo queue nếu trống
                 if(!this.state.queue.length) {
                     this.state.queue = DB.vocab.filter(i => !i.trash && i.next <= Date.now()).sort((a,b) => a.next - b.next);
-                    this.state.initialQueueSize = this.state.queue.length; // Ghi nhớ tổng số lượng để tính % progress bar
+                    this.state.initialQueueSize = this.state.queue.length;
                 }
-
-                // Cập nhật Progress Bar chuẩn logic
                 const progress = document.getElementById('progress');
                 if (this.state.initialQueueSize > 0) {
                     const doneCount = this.state.initialQueueSize - this.state.queue.length;
                     progress.style.width = `${(doneCount / this.state.initialQueueSize) * 100}%`;
-                } else {
-                    progress.style.width = '100%';
-                }
+                } else { progress.style.width = '100%'; }
 
                 if(!this.state.queue.length) {
                     v.innerHTML = `<div class="card-side border-dashed border-zinc-800 text-[10px] font-black uppercase text-zinc-600 italic">Target Cleared.</div>`;
-                    this.state.initialQueueSize = 0; // Reset
-                    return;
+                    this.state.initialQueueSize = 0; return;
                 }
                 
                 const item = this.state.queue[0];
@@ -147,32 +140,27 @@
             },
             flip() {
                 if(this.state.view !== 'study' || !this.state.queue.length || this.state.flipped) return;
-                Sfx.init(); // Init AudioContext on first interaction
-                this.state.flipped = true;
+                Sfx.init(); this.state.flipped = true;
                 document.getElementById('cf').classList.add('hidden');
                 document.getElementById('cb').classList.remove('hidden');
                 document.getElementById('ctrl').classList.remove('opacity-10', 'pointer-events-none');
-                
                 const item = this.state.queue[0];
                 window.speechSynthesis.cancel();
-                const m = new SpeechSynthesisUtterance(item.en); 
-                m.rate = DB.meta.speechRate; 
+                const m = new SpeechSynthesisUtterance(item.en); m.rate = DB.meta.speechRate;
                 window.speechSynthesis.speak(m);
             },
             ans(isPass) {
                 if(!this.state.flipped) return;
-                const item = this.state.queue.shift(); // Lấy từ ra khỏi queue
-                
+                const item = this.state.queue.shift();
                 if(!isPass) {
                     Sfx.fail();
                     item.failCount = (item.failCount || 0) + 1;
-                    this.processFSRS(item, 1); // FIX: Cập nhật FSRS là "Again" (1) để thuật toán biết là quên
-                    this.state.queue.push(item); // Nhét lại xuống cuối hàng đợi
+                    this.processFSRS(item, 1);
+                    this.state.queue.push(item);
                 } else {
                     Sfx.pass();
                     item.failCount = 0;
-                    this.processFSRS(item, 3); // Cập nhật FSRS là "Good" (3)
-                    
+                    this.processFSRS(item, 3);
                     const ds = new Date().toDateString();
                     if(DB.meta.lastDate !== ds) {
                         const l = new Date(DB.meta.lastDate);
@@ -182,27 +170,41 @@
                 }
                 DB.save(); this.route('study');
             },
+            // 2. LOGIC ÉP XUNG FSRS v5 - TINH CHỈNH THEO DỮ LIỆU THỜI GIAN THỰC
             processFSRS(item, g) {
-                let { s, d, reps, laps } = item;
-                if (!reps) { s = W[g-1]; d = W[4] - (g-3)*W[5]; reps = 0; laps = 0; }
-                else {
-                    const r = Math.exp(Math.log(0.9) * (item.interval / s));
+                let { s, d, reps, laps, lastReview } = item;
+                const now = Date.now();
+                const t = lastReview ? Math.max(0, (now - lastReview) / 86400000) : 0;
+
+                if (!reps || reps === 0) {
+                    s = W[g-1];
+                    d = W[4] - (g-3)*W[5];
+                    reps = 0; laps = 0;
+                } else {
+                    const r = Math.exp(Math.log(0.9) * (t / s));
                     d = Math.min(10, Math.max(1, d - W[6]*(g-3)));
                     d = W[4] - W[5]*(g-3) + (d - W[4])*W[7];
-                    // FIX Logic FAIL: Nếu quên thì cập nhật stability theo công thức Again
-                    if(g === 1) { 
-                        s = W[11]*Math.pow(d,-W[12])*(Math.pow(s+1,W[13])-1)*Math.exp(W[14]*(1-r)); 
-                        laps++; 
-                    } else { 
-                        const h = 1; s = s*(1+Math.exp(W[8])*(11-d)*Math.pow(s,-W[9])*(Math.exp(W[10]*(1-r))-1)*h); 
+                    
+                    if(g === 1) {
+                        s = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r));
+                        laps++;
+                    } else {
+                        s = s * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp(W[10] * (1 - r)) - 1));
                     }
                 }
                 reps++;
-                let i = s / Math.log(0.9) * Math.log(DB.meta.retention);
-                let finalI = Math.max(1, Math.round(i * (0.95 + Math.random()*0.1)));
-                if(g === 1) finalI = 1; // Nếu FAIL thì mai học lại luôn hoặc học lại ngay
+                item.lastReview = now;
+                let ivl = s / Math.log(0.9) * Math.log(DB.meta.retention || 0.9);
+                ivl = Math.max(1, Math.round(ivl));
                 
-                Object.assign(item, { s, d, reps, laps, interval: finalI, next: Date.now() + finalI*86400000 });
+                // FUZZING TRÁNH CLUMPING
+                if (ivl > 2) {
+                    const f = ivl * 0.05;
+                    ivl = Math.round(ivl + (Math.random() * f * 2 - f));
+                }
+                if(g === 1) ivl = 0; // Để học lại ngay trong phiên hoặc ngày mai tùy queue
+
+                Object.assign(item, { s, d, reps, laps, interval: ivl, next: now + (g === 1 ? 0 : ivl * 86400000) });
             },
             renderNexus(p) {
                 p.innerHTML = `
@@ -212,12 +214,8 @@
                         <input id="in-vi" autocomplete="off" placeholder="NGHĨA" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
                         <button onclick="Core.add()" class="bg-teal-500 hover:bg-teal-400 text-black py-4 rounded-2xl font-black uppercase text-[10px] transition-colors">Add to Brain [Enter]</button>
                     </div>
-                    
                     <div class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow flex flex-col group">
-                        <div class="text-[9px] font-black uppercase text-zinc-600 mb-2 px-2 flex justify-between">
-                            <span>Bulk Import</span>
-                            <span>word:meaning</span>
-                        </div>
+                        <div class="text-[9px] font-black uppercase text-zinc-600 mb-2 px-2 flex justify-between"><span>Bulk Import</span><span>word:meaning</span></div>
                         <textarea id="in-batch" placeholder="apple:quả táo&#10;banana:quả chuối" class="flex-grow w-full bg-transparent text-teal-100/70 outline-none font-bold text-sm custom-scroll p-2 resize-none"></textarea>
                         <button onclick="Core.batch()" class="mt-2 bg-zinc-800 text-zinc-400 py-3 rounded-xl font-black text-[9px] uppercase hover:bg-zinc-700 hover:text-white transition-colors">Import Batch</button>
                     </div>
@@ -239,39 +237,26 @@
             add() {
                 const en = document.getElementById('in-en').value.trim(), vi = document.getElementById('in-vi').value.trim();
                 if(!en || !vi) return;
-                DB.vocab.push({ id: Date.now(), en, vi, next: Date.now(), trash: false, failCount: 0 });
-                DB.save(); 
-                document.getElementById('in-en').value = ''; 
-                document.getElementById('in-vi').value = ''; 
-                document.getElementById('in-en').focus();
+                DB.vocab.push({ id: Date.now(), en, vi, next: Date.now(), trash: false, failCount: 0, reps: 0, s: 0, d: 0, laps: 0, lastReview: 0 });
+                DB.save(); document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; document.getElementById('in-en').focus();
             },
-            // UPGRADE CỰC MẠNH CHO BATCH IMPORT (Thông minh, chống lỗi)
             batch() {
                 const lines = document.getElementById('in-batch').value.split('\n');
                 let count = 0;
                 lines.forEach(l => {
-                    // Regex thông minh: tự nhận diện dấu ':' hoặc '-' hoặc '=' để tách từ
                     const match = l.match(/^(.*?)(?::|-|=)(.*)$/);
                     if(match) {
-                        const en = match[1].trim();
-                        const vi = match[2].trim();
+                        const en = match[1].trim(), vi = match[2].trim();
                         if(en && vi) {
-                            DB.vocab.push({ id: Date.now() + Math.random(), en, vi, next: Date.now(), trash: false, failCount: 0 });
+                            DB.vocab.push({ id: Date.now() + Math.random(), en, vi, next: Date.now(), trash: false, failCount: 0, reps: 0, s: 0, d: 0, laps: 0, lastReview: 0 });
                             count++;
                         }
                     }
                 });
-                if(count > 0) {
-                    DB.save(); 
-                    document.getElementById('in-batch').value = ''; 
-                    alert(`⚡ Đã import thành công ${count} từ vào bộ nhớ!`);
-                    this.route('nexus'); // Refresh lại UI Target Today
-                }
+                if(count > 0) { DB.save(); document.getElementById('in-batch').value = ''; alert(`⚡ Imported ${count} words!`); this.route('nexus'); }
             },
             renderVault(v) {
-                v.innerHTML = `
-                <input id="v-search" oninput="Core.search(this.value)" placeholder="SEARCH..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-white rounded-2xl outline-none font-bold text-sm mb-3 focus:ring-1 ring-zinc-700">
-                <div id="v-list" class="overflow-y-auto max-h-[60vh] flex flex-col gap-2 custom-scroll"></div>`;
+                v.innerHTML = `<input id="v-search" oninput="Core.search(this.value)" placeholder="SEARCH..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-white rounded-2xl outline-none font-bold text-sm mb-3 focus:ring-1 ring-zinc-700"><div id="v-list" class="overflow-y-auto max-h-[60vh] flex flex-col gap-2 custom-scroll"></div>`;
                 this.search('');
             },
             search(q) {
@@ -279,8 +264,7 @@
                 const items = DB.vocab.filter(i => !i.trash && (i.en.toLowerCase().includes(q.toLowerCase()) || i.vi.toLowerCase().includes(q.toLowerCase())));
                 items.slice(-50).reverse().forEach(item => {
                     const d = document.createElement('div'); d.className = "flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl";
-                    d.innerHTML = `<div class="text-xs font-black uppercase">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div>
-                    <button onclick="Core.del(${item.id})" class="text-[8px] font-black text-red-900/50 hover:text-red-500 uppercase px-3 py-2">DEL</button>`;
+                    d.innerHTML = `<div class="text-xs font-black uppercase">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div><button onclick="Core.del(${item.id})" class="text-[8px] font-black text-red-900/50 hover:text-red-500 uppercase px-3 py-2">DEL</button>`;
                     list.appendChild(d);
                 });
             },
@@ -297,30 +281,13 @@
         };
 
         window.onkeydown = (e) => {
-            const k = e.key.toLowerCase(); 
-            const foc = document.activeElement.id;
-            const tag = document.activeElement.tagName;
-
-            // FIX CỰC MẠNH: Chỉ ấn Enter để Add khi đang ở đúng 2 ô Input của Nexus
-            if(foc === 'in-en' || foc === 'in-vi') { 
-                if(e.key === 'Enter') { e.preventDefault(); Core.add(); } 
-                return; 
-            }
-            // Không can thiệp nếu đang gõ trong Textarea (Bulk Import) hoặc Search
+            const k = e.key.toLowerCase(); const foc = document.activeElement.id; const tag = document.activeElement.tagName;
+            if(foc === 'in-en' || foc === 'in-vi') { if(e.key === 'Enter') { e.preventDefault(); Core.add(); } return; }
             if(tag === 'TEXTAREA' || foc === 'v-search') return;
-
-            // Chuyển tab nhanh (bảo vệ không nhảy tab khi đang nhập liệu bất kỳ)
-            if(['a','s','d','f'].includes(k) && tag !== 'INPUT' && tag !== 'TEXTAREA') { 
-                e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); 
-            }
-            
-            // Logic Lật thẻ & Nhấn phím 1-2 (Giữ nguyên phím bấm theo yêu cầu)
+            if(['a','s','d','f'].includes(k) && tag !== 'INPUT' && tag !== 'TEXTAREA') { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
             if(Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
-                if(Core.state.flipped) {
-                    if(k === '1') Core.ans(false);
-                    if(k === '2') Core.ans(true);
-                }
+                if(Core.state.flipped) { if(k === '1') Core.ans(false); if(k === '2') Core.ans(true); }
             }
         };
 
