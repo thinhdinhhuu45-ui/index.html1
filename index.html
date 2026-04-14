@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KP STRIKER | FSRS v5 DEEP-OPT PRO</title>
+    <title>KP STRIKER | FSRS v5 BATCH-ONLY</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #000; color: #d4d4d8; overflow: hidden; margin: 0; }
@@ -35,7 +35,6 @@
 
     <script>
         const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
-
         const DB = {
             idb: null,
             meta: { streak: 0, lastDate: null, retention: 0.9, W: [...DEFAULT_W], backupCount: 0 },
@@ -127,7 +126,6 @@
                 const now = Date.now();
                 const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
                 let { s, d, reps, logs = [] } = item; const w = DB.meta.W;
-                // PHỤC HỒI DÒNG QUAN TRỌNG:
                 logs.push({ g, t, s, d, date: now });
                 if (reps === 0) {
                     s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
@@ -153,27 +151,23 @@
             },
             renderNexus(p) {
                 p.innerHTML = `<div class="h-full flex flex-col gap-3">
-                    <div class="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 flex flex-col gap-2">
-                        <input id="in-en" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
-                        <input id="in-vi" autocomplete="off" placeholder="MEANING" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
-                        <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Add</button>
+                    <div class="flex-grow flex flex-col min-h-0 bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6">
+                        <div class="text-[10px] font-black text-zinc-600 uppercase mb-4 tracking-widest text-center">AI Batch Import (Word:Meaning)</div>
+                        <textarea id="in-batch" placeholder="example:ví dụ&#10;math:toán học" class="flex-grow w-full bg-transparent text-teal-500 outline-none font-bold text-lg custom-scroll resize-none"></textarea>
                     </div>
-                    <textarea id="in-batch" placeholder="word:meaning" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
-                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Batch Import</button>
+                    <button onclick="Core.batch()" class="bg-teal-500 text-black py-5 rounded-2xl font-black uppercase text-xs shadow-lg shadow-teal-500/20 active:scale-95 transition-transform">Import to Vault</button>
                 </div>`;
             },
-            async add() {
-                const en = document.getElementById('in-en').value.trim(), vi = document.getElementById('in-vi').value.trim();
-                if(!en || !vi) return;
-                await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
-                document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; DB.updateUI();
-            },
             async batch() {
-                const lines = document.getElementById('in-batch').value.split('\n');
+                const raw = document.getElementById('in-batch').value;
+                if(!raw.trim()) return;
+                const lines = raw.split('\n');
                 for(let l of lines) {
                     const m = l.match(/^(.*?)(?::|-|=)(.*)$/);
                     if(m && m[1].trim() && m[2].trim()) await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
                 }
+                document.getElementById('in-batch').value = ''; 
+                DB.updateUI();
                 this.route('study');
             },
             async renderVault(v) {
@@ -222,7 +216,7 @@
 
         window.onkeydown = e => {
             const foc = document.activeElement.id, tag = document.activeElement.tagName;
-            if(['in-en', 'in-vi', 'w-editor', 'in-batch', 'vault-search'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
+            if(['w-editor', 'in-batch', 'vault-search'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
             const k = e.key.toLowerCase();
             if(['a','s','d','f'].includes(k)) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
             if(Core.state.view === 'study' && Core.state.queue.length) {
