@@ -34,6 +34,7 @@
     </div>
 
     <script>
+        // Trọng số FSRS v5 mặc định
         const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
 
         const DB = {
@@ -78,13 +79,15 @@
                 document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
                 const port = document.getElementById('view');
                 port.innerHTML = '';
+                
                 if(v === 'study') {
                     const v_list = await DB.getVocab();
                     this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
                     this.state.initialQueueSize = this.state.queue.length;
                     this.renderStudyFrame(port);
                     this.nextCard();
-                } else if(v === 'nexus') this.renderNexus(port);
+                } 
+                else if(v === 'nexus') this.renderNexus(port);
                 else if(v === 'vault') this.renderVault(port);
                 else if(v === 'data') this.renderData(port);
             },
@@ -100,7 +103,7 @@
                         ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-6 rounded-2xl text-[10px] font-black uppercase">${['Again','Hard','Good','Easy'][g-1]} [${g}]</button>`).join('')}
                     </div>
                 </div>
-                <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Clear.</div>`;
+                <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! Nghỉ thôi! 🍵</div>`;
             },
 
             nextCard() {
@@ -112,27 +115,40 @@
                     document.getElementById('progress').style.width = '100%';
                     return;
                 }
-                const item = this.state.queue[0].ref || this.state.queue[0];
+                const qItem = this.state.queue[0];
+                const item = qItem.ref || qItem;
                 this.state.fsm = 'FRONT';
                 document.getElementById('en-disp').innerText = item.en;
                 document.getElementById('vi-disp').innerText = item.vi;
                 document.getElementById('cf').classList.remove('hidden');
                 document.getElementById('cb').classList.add('hidden');
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
-                document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
+                
+                const prog = this.state.initialQueueSize > 0 ? ((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100 : 0;
+                document.getElementById('progress').style.width = `${prog}%`;
             },
 
-            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
+            flip() { 
+                if(this.state.fsm === 'FRONT') { 
+                    this.state.fsm = 'BACK'; 
+                    document.getElementById('cf').classList.add('hidden'); 
+                    document.getElementById('cb').classList.remove('hidden'); 
+                    document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); 
+                } 
+            },
 
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
                 const qItem = this.state.queue.shift();
                 const item = qItem.ref || qItem;
+                
                 this.calculate(item, g);
                 await DB.saveItem(item);
+                
                 if(g === 1) this.state.queue.splice(Math.min(2, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 else if(!qItem.isDebt) this.updateStreak();
+                
                 DB.meta.backupCount++;
                 if(DB.meta.backupCount >= 50) { DB.meta.backupCount = 0; this.exp(true); }
                 await DB.saveMeta();
@@ -144,36 +160,45 @@
                 const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
                 let { s, d, reps, logs = [] } = item;
                 const w = DB.meta.W;
+                
                 logs.push({ g, t, s, d, date: now });
+
                 if (reps === 0) {
-                    s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
+                    s = w[g - 1]; 
+                    d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
                     const r = Math.exp(Math.log(0.9) * (t / s));
+                    // Cập nhật độ khó (Difficulty)
                     d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
+                    // Mean Reversion: Kéo độ khó về mức trung bình w[4] (Giúp giảm "ám" độ khó khoa học)
                     d = w[4] * (1 - w[7]) + d * w[7];
+                    
                     if (g === 1) s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
                     else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
                 }
-                if (isNaN(s) || !isFinite(s) || s <= 0) s = 0.1;
-                if (isNaN(d) || !isFinite(d) || d <= 0) d = 5;
+
+                s = Math.max(0.1, isFinite(s) ? s : 0.1);
+                d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
+                
                 let ivl = (g === 1) ? 0 : Math.max(1, Math.round(s / Math.log(0.9) * Math.log(DB.meta.retention)));
                 if (ivl > 2) ivl = Math.round(ivl + (Math.random() * (ivl * 0.1) - ivl * 0.05));
+                
                 Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000), logs });
             },
 
+            // Các hàm mô phỏng và tối ưu (giữ nguyên logic gốc của cậu)
             calculateSimulated(s, d, g, w, reps, t) {
                 let newS, newD;
                 if (reps === 0) {
-                    newS = w[g - 1];
-                    newD = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
+                    newS = w[g - 1]; newD = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
                     const r = Math.exp(Math.log(0.9) * (t / s));
                     newD = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
                     newD = w[4] * (1 - w[7]) + newD * w[7];
-                    if (g === 1) newS = w[11] * Math.pow(newD, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(newS * (1 - r));
+                    if (g === 1) newS = w[11] * Math.pow(newD, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
                     else newS = s * (1 + Math.exp(w[8]) * (11 - newD) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
                 }
-                return { s: newS, d: newD };
+                return { s: Math.max(0.1, newS), d: Math.min(Math.max(newD, 1), 10) };
             },
 
             async optimize() {
@@ -181,21 +206,18 @@
                 this.state.isOptimizing = true;
                 try {
                     const vocab = await DB.getVocab();
-                    const N = vocab.length;
-                    if (N < 5) { alert("Cần ít nhất 5 từ để 'luyện não'."); return; }
-                    const iterations = Math.min(5000, Math.max(500, N * 15));
-                    const chunk = 100; 
+                    if (vocab.length < 5) { alert("Cần ít nhất 5 từ để 'luyện não'!"); return; }
+                    const iterations = Math.min(5000, Math.max(500, vocab.length * 15));
                     let bestW = [...DB.meta.W];
+                    
                     const calcTotalRMSE = (weights) => {
-                        if (!vocab || vocab.length === 0) return 1;
                         let preds = [], acts = [];
                         vocab.forEach(card => {
                             if (!card.logs?.length) return;
                             let simS = 0, simD = 0, reps = 0;
                             card.logs.forEach(log => {
                                 if (reps > 0) {
-                                    const r_pred = Math.exp(Math.log(0.9) * (log.t / simS));
-                                    preds.push(r_pred);
+                                    preds.push(Math.exp(Math.log(0.9) * (log.t / simS)));
                                     acts.push(log.g > 1 ? 1 : 0);
                                 }
                                 const res = this.calculateSimulated(simS, simD, log.g, weights, reps, log.t);
@@ -211,34 +233,33 @@
                         });
                         let err = 0, used = 0;
                         bins.forEach(b => { if (b.count > 0) { err += Math.pow((b.sumA/b.count)-(b.sumP/b.count), 2); used++; } });
-                        return Math.sqrt(err / used);
+                        return Math.sqrt(err / (used || 1));
                     };
+
                     let minRMSE = calcTotalRMSE(bestW);
                     for (let i = 0; i < iterations; i++) {
-                        const lr = 0.05 * (1 - i / iterations); 
+                        const lr = 0.05 * (1 - i / iterations);
                         let testW = bestW.map((v, idx) => {
                             let nV = v * (1 + (Math.random() * 2 - 1) * lr);
-                            if (idx <= 3 && nV < 0.1) nV = 0.1;
+                            if (idx <= 3) nV = Math.max(nV, 0.1);
                             if (idx === 4) nV = Math.min(Math.max(nV, 1), 10);
                             return nV;
                         });
                         if (!(testW[0] < testW[1] && testW[1] < testW[2] && testW[2] < testW[3])) continue;
                         let curRMSE = calcTotalRMSE(testW);
                         if (curRMSE < minRMSE) { minRMSE = curRMSE; bestW = testW; }
-                        if (i % chunk === 0) { await new Promise(r => setTimeout(r, 0)); }
+                        if (i % 100 === 0) await new Promise(r => setTimeout(r, 0));
                     }
-                    DB.meta.W = bestW;
-                    await DB.saveMeta();
-                    this.route('data'); 
-                    alert(`Deep-Ascent Xong!\nLặp: ${iterations} lần\nRMSE: ${minRMSE.toFixed(5)}`);
+                    DB.meta.W = bestW; await DB.saveMeta(); this.route('data');
+                    alert(`Tối ưu xong rùi! ✨\nRMSE: ${minRMSE.toFixed(5)}`);
                 } finally { this.state.isOptimizing = false; }
             },
 
             updateStreak() {
                 const ds = new Date().toDateString();
                 if(DB.meta.lastDate !== ds) {
-                    const l = new Date(DB.meta.lastDate);
-                    DB.meta.streak = (new Date()-l < 151200000) ? DB.meta.streak+1 : 1;
+                    const last = new Date(DB.meta.lastDate);
+                    DB.meta.streak = (new Date() - last < 172800000) ? DB.meta.streak + 1 : 1;
                     DB.meta.lastDate = ds;
                 }
             },
@@ -246,12 +267,12 @@
             renderNexus(p) {
                 p.innerHTML = `<div class="h-full flex flex-col gap-3">
                     <div class="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 flex flex-col gap-2">
-                        <input id="in-en" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
-                        <input id="in-vi" autocomplete="off" placeholder="MEANING" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
-                        <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Add</button>
+                        <input id="in-en" autocomplete="off" placeholder="TỪ VỰNG" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
+                        <input id="in-vi" autocomplete="off" placeholder="NGHĨA" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
+                        <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Thêm từ</button>
                     </div>
-                    <textarea id="in-batch" placeholder="word:meaning" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
-                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Batch Import</button>
+                    <textarea id="in-batch" placeholder="word:meaning (mỗi dòng 1 từ)" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
+                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Nhập hàng loạt</button>
                 </div>`;
             },
 
@@ -263,20 +284,16 @@
             },
 
             async batch() {
-                // Lấy toàn bộ từ hiện có để kiểm tra trùng
                 const vocab = await DB.getVocab();
                 const existing = new Set(vocab.map(v => v.en.toLowerCase().trim()));
                 const lines = document.getElementById('in-batch').value.split('\n');
-                
                 for(let l of lines) {
                     const m = l.match(/^(.*?)(?::|-|=)(.*)$/);
                     if(m && m[1].trim() && m[2].trim()) {
-                        const en = m[1].trim();
-                        const vi = m[2].trim();
-                        // Chỉ thêm nếu từ chưa tồn tại (không phân biệt hoa thường)
+                        const en = m[1].trim(), vi = m[2].trim();
                         if(!existing.has(en.toLowerCase())) {
                             await DB.saveItem({ id: Date.now() + Math.random(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
-                            existing.add(en.toLowerCase()); // Cập nhật set để tránh trùng lặp ngay trong cùng 1 đợt batch
+                            existing.add(en.toLowerCase());
                         }
                     }
                 }
@@ -288,7 +305,7 @@
                 v.innerHTML = `<div class="h-full overflow-y-auto custom-scroll flex flex-col gap-2">${vocab.reverse().map(item => `
                     <div class="flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-h-[64px]">
                         <div class="text-xs font-black uppercase truncate">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div>
-                        <button onclick="Core.del(${item.id})" class="text-[8px] font-black text-red-900/40 uppercase">DEL</button>
+                        <button onclick="Core.del(${item.id})" class="text-[8px] font-black text-red-900/40 uppercase">XÓA</button>
                     </div>`).join('')}</div>`;
             },
 
@@ -297,9 +314,9 @@
             renderData(v) {
                 v.innerHTML = `
                 <div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4">
-                    <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Deep-Ascent W</div>
+                    <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Weights</div>
                     <textarea id="w-editor" class="w-full bg-black border border-zinc-800 p-3 rounded-xl text-[10px] text-teal-500 font-mono h-24 mb-4">${JSON.stringify(DB.meta.W)}</textarea>
-                    <button onclick="Core.optimize()" class="w-full py-4 bg-teal-500 text-black rounded-xl font-black text-[10px] uppercase mb-2">Optimize (Adaptive iterations)</button>
+                    <button onclick="Core.optimize()" class="w-full py-4 bg-teal-500 text-black rounded-xl font-black text-[10px] uppercase mb-2">Optimize (Deep Ascent)</button>
                     <button onclick="Core.saveW()" class="w-full py-2 bg-zinc-800 text-zinc-400 rounded-xl font-black text-[9px] uppercase">Manual Save</button>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -309,11 +326,11 @@
                 </div>`;
             },
 
-            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Saved."); } catch(e) { alert("Error."); } },
+            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Đã lưu Weights."); } catch(e) { alert("Lỗi định dạng JSON!"); } },
             async exp(isAuto = false) { 
                 const v = await DB.getVocab(), a = document.createElement('a'); 
                 a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'}));
-                a.download = isAuto ? `AUTO_BACKUP.json` : `STRIKER_V5.json`; a.click();
+                a.download = isAuto ? `AUTO_BACKUP.json` : `STRIKER_DATA.json`; a.click();
             },
             imp(el) {
                 const r = new FileReader(); r.onload = async e => {
@@ -323,12 +340,17 @@
             }
         };
 
+        // Phím tắt
         window.onkeydown = e => {
-            const k = e.key, foc = document.activeElement.id;
-            if(['in-en', 'in-vi', 'w-editor'].includes(foc) || document.activeElement.tagName === 'TEXTAREA') return;
-            if(['a','s','d','f'].includes(k.toLowerCase())) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); return; }
+            const foc = document.activeElement.id, tag = document.activeElement.tagName;
+            if(['in-en', 'in-vi', 'w-editor', 'in-batch'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
+            const k = e.key.toLowerCase();
+            if(['a','s','d','f'].includes(k)) { 
+                e.preventDefault(); 
+                Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); 
+            }
             if(Core.state.view === 'study' && Core.state.queue.length) {
-                if(e.code === 'Space') { e.preventDefault(); Core.flip(); return; }
+                if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
                 if(Core.state.fsm === 'BACK' && ['1','2','3','4'].includes(k)) { Core.ans(parseInt(k)); }
             }
         };
