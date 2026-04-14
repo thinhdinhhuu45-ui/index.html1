@@ -13,6 +13,7 @@
         .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; border-radius: 32px; width: 100%; border: 1px solid #14b8a611; }
         .progress-bar { position: fixed; bottom: 0; left: 0; height: 3px; background: #14b8a6; transition: width 0.3s; z-index: 50; }
         .custom-scroll::-webkit-scrollbar { display: none; }
+        .opt-loading { background: linear-gradient(90deg, #14b8a6 var(--p), #27272a var(--p)); }
     </style>
 </head>
 <body class="flex justify-center p-2 sm:p-4">
@@ -34,7 +35,6 @@
     </div>
 
     <script>
-        // Trọng số FSRS v5 mặc định
         const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
 
         const DB = {
@@ -79,15 +79,13 @@
                 document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
                 const port = document.getElementById('view');
                 port.innerHTML = '';
-                
                 if(v === 'study') {
                     const v_list = await DB.getVocab();
                     this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
                     this.state.initialQueueSize = this.state.queue.length;
                     this.renderStudyFrame(port);
                     this.nextCard();
-                } 
-                else if(v === 'nexus') this.renderNexus(port);
+                } else if(v === 'nexus') this.renderNexus(port);
                 else if(v === 'vault') this.renderVault(port);
                 else if(v === 'data') this.renderData(port);
             },
@@ -103,7 +101,7 @@
                         ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-6 rounded-2xl text-[10px] font-black uppercase">${['Again','Hard','Good','Easy'][g-1]} [${g}]</button>`).join('')}
                     </div>
                 </div>
-                <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! Nghỉ thôi! 🍵</div>`;
+                <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! ✨</div>`;
             },
 
             nextCard() {
@@ -123,32 +121,20 @@
                 document.getElementById('cf').classList.remove('hidden');
                 document.getElementById('cb').classList.add('hidden');
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
-                
-                const prog = this.state.initialQueueSize > 0 ? ((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100 : 0;
-                document.getElementById('progress').style.width = `${prog}%`;
+                document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
             },
 
-            flip() { 
-                if(this.state.fsm === 'FRONT') { 
-                    this.state.fsm = 'BACK'; 
-                    document.getElementById('cf').classList.add('hidden'); 
-                    document.getElementById('cb').classList.remove('hidden'); 
-                    document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); 
-                } 
-            },
+            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
 
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
                 const qItem = this.state.queue.shift();
                 const item = qItem.ref || qItem;
-                
                 this.calculate(item, g);
                 await DB.saveItem(item);
-                
                 if(g === 1) this.state.queue.splice(Math.min(2, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 else if(!qItem.isDebt) this.updateStreak();
-                
                 DB.meta.backupCount++;
                 if(DB.meta.backupCount >= 50) { DB.meta.backupCount = 0; this.exp(true); }
                 await DB.saveMeta();
@@ -160,33 +146,23 @@
                 const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
                 let { s, d, reps, logs = [] } = item;
                 const w = DB.meta.W;
-                
                 logs.push({ g, t, s, d, date: now });
-
                 if (reps === 0) {
-                    s = w[g - 1]; 
-                    d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
+                    s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
                     const r = Math.exp(Math.log(0.9) * (t / s));
-                    // Cập nhật độ khó (Difficulty)
                     d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
-                    // Mean Reversion: Kéo độ khó về mức trung bình w[4] (Giúp giảm "ám" độ khó khoa học)
                     d = w[4] * (1 - w[7]) + d * w[7];
-                    
                     if (g === 1) s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
                     else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
                 }
-
                 s = Math.max(0.1, isFinite(s) ? s : 0.1);
                 d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                
-                let ivl = (g === 1) ? 0 : Math.max(1, Math.round(s / Math.log(0.9) * Math.log(DB.meta.retention)));
+                let ivl = (g === 1) ? (10 / 1440) : Math.max(1, Math.round(s / Math.log(0.9) * Math.log(DB.meta.retention)));
                 if (ivl > 2) ivl = Math.round(ivl + (Math.random() * (ivl * 0.1) - ivl * 0.05));
-                
                 Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000), logs });
             },
 
-            // Các hàm mô phỏng và tối ưu (giữ nguyên logic gốc của cậu)
             calculateSimulated(s, d, g, w, reps, t) {
                 let newS, newD;
                 if (reps === 0) {
@@ -204,12 +180,13 @@
             async optimize() {
                 if (this.state.isOptimizing) return;
                 this.state.isOptimizing = true;
+                const btn = document.getElementById('btn-opt');
                 try {
                     const vocab = await DB.getVocab();
-                    if (vocab.length < 5) { alert("Cần ít nhất 5 từ để 'luyện não'!"); return; }
-                    const iterations = Math.min(5000, Math.max(500, vocab.length * 15));
+                    const N = vocab.length;
+                    if (N < 5) { alert("Cần ít nhất 5 từ."); return; }
+                    const iterations = Math.min(5000, Math.max(500, N * 15));
                     let bestW = [...DB.meta.W];
-                    
                     const calcTotalRMSE = (weights) => {
                         let preds = [], acts = [];
                         vocab.forEach(card => {
@@ -235,7 +212,6 @@
                         bins.forEach(b => { if (b.count > 0) { err += Math.pow((b.sumA/b.count)-(b.sumP/b.count), 2); used++; } });
                         return Math.sqrt(err / (used || 1));
                     };
-
                     let minRMSE = calcTotalRMSE(bestW);
                     for (let i = 0; i < iterations; i++) {
                         const lr = 0.05 * (1 - i / iterations);
@@ -248,18 +224,21 @@
                         if (!(testW[0] < testW[1] && testW[1] < testW[2] && testW[2] < testW[3])) continue;
                         let curRMSE = calcTotalRMSE(testW);
                         if (curRMSE < minRMSE) { minRMSE = curRMSE; bestW = testW; }
-                        if (i % 100 === 0) await new Promise(r => setTimeout(r, 0));
+                        if (i % 100 === 0) {
+                            btn.style.setProperty('--p', `${(i/iterations)*100}%`);
+                            await new Promise(r => setTimeout(r, 0));
+                        }
                     }
                     DB.meta.W = bestW; await DB.saveMeta(); this.route('data');
-                    alert(`Tối ưu xong rùi! ✨\nRMSE: ${minRMSE.toFixed(5)}`);
-                } finally { this.state.isOptimizing = false; }
+                    alert(`Deep-Ascent Xong!\nRMSE: ${minRMSE.toFixed(5)}`);
+                } finally { this.state.isOptimizing = false; btn.style.setProperty('--p', '0%'); }
             },
 
             updateStreak() {
                 const ds = new Date().toDateString();
                 if(DB.meta.lastDate !== ds) {
-                    const last = new Date(DB.meta.lastDate);
-                    DB.meta.streak = (new Date() - last < 172800000) ? DB.meta.streak + 1 : 1;
+                    const l = new Date(DB.meta.lastDate);
+                    DB.meta.streak = (new Date()-l < 172800000) ? DB.meta.streak+1 : 1;
                     DB.meta.lastDate = ds;
                 }
             },
@@ -267,19 +246,19 @@
             renderNexus(p) {
                 p.innerHTML = `<div class="h-full flex flex-col gap-3">
                     <div class="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 flex flex-col gap-2">
-                        <input id="in-en" autocomplete="off" placeholder="TỪ VỰNG" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
-                        <input id="in-vi" autocomplete="off" placeholder="NGHĨA" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
-                        <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Thêm từ</button>
+                        <input id="in-en" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
+                        <input id="in-vi" autocomplete="off" placeholder="MEANING" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
+                        <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Add</button>
                     </div>
-                    <textarea id="in-batch" placeholder="word:meaning (mỗi dòng 1 từ)" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
-                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Nhập hàng loạt</button>
+                    <textarea id="in-batch" placeholder="word:meaning" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
+                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Batch Import</button>
                 </div>`;
             },
 
             async add() {
                 const en = document.getElementById('in-en').value.trim(), vi = document.getElementById('in-vi').value.trim();
                 if(!en || !vi) return;
-                await DB.saveItem({ id: Date.now(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
+                await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; DB.updateUI();
             },
 
@@ -292,7 +271,7 @@
                     if(m && m[1].trim() && m[2].trim()) {
                         const en = m[1].trim(), vi = m[2].trim();
                         if(!existing.has(en.toLowerCase())) {
-                            await DB.saveItem({ id: Date.now() + Math.random(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
+                            await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
                             existing.add(en.toLowerCase());
                         }
                     }
@@ -302,11 +281,29 @@
 
             async renderVault(v) {
                 const vocab = await DB.getVocab();
-                v.innerHTML = `<div class="h-full overflow-y-auto custom-scroll flex flex-col gap-2">${vocab.reverse().map(item => `
-                    <div class="flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-h-[64px]">
-                        <div class="text-xs font-black uppercase truncate">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div>
-                        <button onclick="Core.del(${item.id})" class="text-[8px] font-black text-red-900/40 uppercase">XÓA</button>
-                    </div>`).join('')}</div>`;
+                v.innerHTML = `
+                <div class="flex flex-col h-full gap-2">
+                    <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-2xl outline-none font-black text-[10px] uppercase mb-1">
+                    <div id="vault-list" class="h-full overflow-y-auto custom-scroll flex flex-col gap-2">
+                        ${vocab.reverse().map(item => this.vaultItemTemplate(item)).join('')}
+                    </div>
+                </div>`;
+            },
+
+            vaultItemTemplate(item) {
+                return `
+                <div class="vault-card flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-h-[64px]" data-en="${item.en.toLowerCase()}" data-vi="${item.vi.toLowerCase()}">
+                    <div class="text-xs font-black uppercase truncate">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div>
+                    <button onclick="Core.del('${item.id}')" class="text-[8px] font-black text-red-900/40 uppercase ml-2">DEL</button>
+                </div>`;
+            },
+
+            filterVault() {
+                const q = document.getElementById('vault-search').value.toLowerCase();
+                document.querySelectorAll('.vault-card').forEach(el => {
+                    const match = el.dataset.en.includes(q) || el.dataset.vi.includes(q);
+                    el.classList.toggle('hidden', !match);
+                });
             },
 
             async del(id) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); },
@@ -314,9 +311,9 @@
             renderData(v) {
                 v.innerHTML = `
                 <div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4">
-                    <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Weights</div>
+                    <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Deep-Ascent W</div>
                     <textarea id="w-editor" class="w-full bg-black border border-zinc-800 p-3 rounded-xl text-[10px] text-teal-500 font-mono h-24 mb-4">${JSON.stringify(DB.meta.W)}</textarea>
-                    <button onclick="Core.optimize()" class="w-full py-4 bg-teal-500 text-black rounded-xl font-black text-[10px] uppercase mb-2">Optimize (Deep Ascent)</button>
+                    <button id="btn-opt" onclick="Core.optimize()" class="opt-loading w-full py-4 text-black rounded-xl font-black text-[10px] uppercase mb-2 bg-zinc-800 transition-all" style="--p: 0%">Optimize (Deep Ascent)</button>
                     <button onclick="Core.saveW()" class="w-full py-2 bg-zinc-800 text-zinc-400 rounded-xl font-black text-[9px] uppercase">Manual Save</button>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -326,11 +323,11 @@
                 </div>`;
             },
 
-            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Đã lưu Weights."); } catch(e) { alert("Lỗi định dạng JSON!"); } },
+            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Saved."); } catch(e) { alert("Error."); } },
             async exp(isAuto = false) { 
                 const v = await DB.getVocab(), a = document.createElement('a'); 
                 a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'}));
-                a.download = isAuto ? `AUTO_BACKUP.json` : `STRIKER_DATA.json`; a.click();
+                a.download = isAuto ? `AUTO_BACKUP.json` : `STRIKER_V5.json`; a.click();
             },
             imp(el) {
                 const r = new FileReader(); r.onload = async e => {
@@ -340,15 +337,11 @@
             }
         };
 
-        // Phím tắt
         window.onkeydown = e => {
             const foc = document.activeElement.id, tag = document.activeElement.tagName;
-            if(['in-en', 'in-vi', 'w-editor', 'in-batch'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
+            if(['in-en', 'in-vi', 'w-editor', 'in-batch', 'vault-search'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
             const k = e.key.toLowerCase();
-            if(['a','s','d','f'].includes(k)) { 
-                e.preventDefault(); 
-                Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); 
-            }
+            if(['a','s','d','f'].includes(k)) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
             if(Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
                 if(Core.state.fsm === 'BACK' && ['1','2','3','4'].includes(k)) { Core.ans(parseInt(k)); }
