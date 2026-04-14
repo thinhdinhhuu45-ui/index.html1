@@ -2,70 +2,33 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KP STRIKER | FSRS v5 PRO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KP STRIKER | FSRS v5 DEEP-OPT PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Khóa cứng khung hình, chống scroll toàn trang */
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; 
-            background: #000;
-            touch-action: manipulation;
-        }
-        body { font-family: ui-sans-serif, system-ui, sans-serif; color: #d4d4d8; display: flex; justify-content: center; }
-        
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #000; color: #d4d4d8; overflow: hidden; }
         .tab-active { background: #14b8a6 !important; color: #000 !important; font-weight: 900 !important; }
-        
-        /* Card styling */
-        .card-side { 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            min-height: 300px; border-radius: 32px; width: 100%; 
-            border: 1px solid #14b8a611; background: #09090b;
-        }
-
-        .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: #14b8a6; transition: width 0.3s; z-index: 100; }
+        header, nav { opacity: 0.5; transition: opacity 0.3s ease; }
+        header:hover, nav:hover { opacity: 1; }
+        .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; border-radius: 32px; width: 100%; border: 1px solid #14b8a611; }
+        .progress-bar { position: fixed; bottom: 0; left: 0; height: 3px; background: #14b8a6; transition: width 0.3s; z-index: 50; }
         .custom-scroll::-webkit-scrollbar { display: none; }
-
-        /* Khung App chính: Dùng dvh để chuẩn trên mobile */
-        #app-container { 
-            display: flex; 
-            flex-direction: column; 
-            height: 100dvh; 
-            width: 100%; 
-            max-width: 32rem; 
-            padding: 12px;
-            box-sizing: border-box;
-        }
-
-        /* Vùng nội dung: Chỉ vùng này được cuộn */
-        #view { 
-            flex: 1; 
-            overflow-y: auto; 
-            margin-top: 8px;
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-        }
-
         .opt-loading { background: linear-gradient(90deg, #14b8a6 var(--p), #27272a var(--p)); }
-        header, nav { shrink: 0; }
+        #app-container { display: flex; flex-direction: column; height: 98dvh; width: 100%; max-width: 32rem; }
+        #view { flex-grow: 1; overflow-y: auto; padding-bottom: 20px; position: relative; }
     </style>
 </head>
-<body>
+<body class="flex justify-center p-2 sm:p-4">
     <div id="progress" class="progress-bar" style="width: 0%"></div>
-    
     <div id="app-container">
-        <header class="bg-zinc-900/80 p-4 rounded-3xl flex justify-between items-center border border-zinc-800">
+        <header class="bg-zinc-900/80 p-5 rounded-3xl flex justify-between items-center mb-3 border border-zinc-800 shrink-0">
             <span class="font-black text-amber-500">🔥 <span id="streak">0</span></span>
             <div id="target-count" class="text-2xl font-black text-teal-500">0</div>
         </header>
 
         <main id="view" class="custom-scroll"></main>
 
-        <nav class="grid grid-cols-4 gap-2">
+        <nav class="mt-3 grid grid-cols-4 gap-2 shrink-0">
             <button onclick="Core.route('study')" id="n-study" class="bg-zinc-900 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase">Study</button>
             <button onclick="Core.route('nexus')" id="n-nexus" class="bg-zinc-900 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase">Nexus</button>
             <button onclick="Core.route('vault')" id="n-vault" class="bg-zinc-900 py-4 rounded-2xl font-bold text-zinc-500 text-xs uppercase">Vault</button>
@@ -74,9 +37,6 @@
     </div>
 
     <script>
-        // ... (Giữ nguyên toàn bộ phần Logic JS của cậu từ DEFAULT_W đến hết Core.route)
-        // Lưu ý: Tớ chỉ sửa phần renderStudyFrame để nó khớp với Layout mới
-        
         const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
 
         const DB = {
@@ -135,19 +95,18 @@
 
             renderStudyFrame(v) {
                 v.innerHTML = `
-                <div id="study-container" class="flex-grow flex flex-col h-full">
-                    <div class="cursor-pointer flex-grow flex flex-col justify-center" onclick="Core.flip()">
-                        <div id="cf" class="card-side p-8 text-center"><h2 id="en-disp" class="text-5xl font-black uppercase"></h2></div>
-                        <div id="cb" class="card-side p-8 text-center hidden"><h2 id="vi-disp" class="text-4xl font-black text-teal-400"></h2></div>
+                <div id="study-container" class="h-full flex flex-col">
+                    <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
+                        <div id="cf" class="card-side bg-zinc-900 p-8 text-center flex-grow"><h2 id="en-disp" class="text-5xl font-black uppercase"></h2></div>
+                        <div id="cb" class="card-side p-8 text-center flex-grow hidden bg-zinc-900"><h2 id="vi-disp" class="text-4xl font-black text-teal-400"></h2></div>
                     </div>
-                    <div id="ctrl" class="grid grid-cols-4 gap-2 mt-4 mb-2 opacity-0 pointer-events-none transition-opacity">
+                    <div id="ctrl" class="grid grid-cols-4 gap-2 mt-3 opacity-0 pointer-events-none transition-opacity">
                         ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-6 rounded-2xl text-[10px] font-black uppercase">${['Again','Hard','Good','Easy'][g-1]} [${g}]</button>`).join('')}
                     </div>
                 </div>
                 <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! ✨</div>`;
             },
-            
-            // ... (Copy nốt các hàm JS còn lại của cậu vào đây)
+
             nextCard() {
                 if(!this.state.queue.length) {
                     const sc = document.getElementById('study-container');
@@ -167,7 +126,9 @@
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
                 document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
             },
+
             flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
+
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
@@ -182,6 +143,7 @@
                 await DB.saveMeta();
                 this.nextCard();
             },
+
             calculate(item, g) {
                 const now = Date.now();
                 const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
@@ -203,6 +165,7 @@
                 if (ivl > 2) ivl = Math.round(ivl + (Math.random() * (ivl * 0.1) - ivl * 0.05));
                 Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000), logs });
             },
+
             async optimize() {
                 if (this.state.isOptimizing) return;
                 this.state.isOptimizing = true;
@@ -213,6 +176,7 @@
                     alert("Optimize Xong!");
                 } finally { this.state.isOptimizing = false; if(btn) btn.style.setProperty('--p', '0%'); }
             },
+
             updateStreak() {
                 const ds = new Date().toDateString();
                 if(DB.meta.lastDate !== ds) {
@@ -221,23 +185,39 @@
                     DB.meta.lastDate = ds;
                 }
             },
+
             renderNexus(p) {
-                p.innerHTML = `<div class="flex flex-col gap-3">
+                p.innerHTML = `<div class="h-full flex flex-col gap-3">
                     <div class="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 flex flex-col gap-2">
-                        <input id="in-en" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
+                        <input id="in-en" oninput="Core.translate()" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
                         <input id="in-vi" autocomplete="off" placeholder="MEANING" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
                         <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Add</button>
                     </div>
-                    <textarea id="in-batch" placeholder="word:meaning" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] h-48 w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
-                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase mb-10">Batch Import</button>
+                    <textarea id="in-batch" placeholder="word:meaning" class="bg-zinc-900 border border-zinc-800 p-4 rounded-[2rem] flex-grow w-full text-zinc-400 outline-none font-bold text-sm custom-scroll resize-none"></textarea>
+                    <button onclick="Core.batch()" class="bg-zinc-800 text-zinc-500 py-3 rounded-xl font-black text-[9px] uppercase">Batch Import</button>
                 </div>`;
             },
+
+            async translate() {
+                const en = document.getElementById('in-en').value.trim();
+                if(en.length < 2) return;
+                clearTimeout(this.state.t_tm);
+                this.state.t_tm = setTimeout(async () => {
+                    try {
+                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${en}&langpair=en|vi`);
+                        const data = await res.json();
+                        if(data.responseData.translatedText) document.getElementById('in-vi').value = data.responseData.translatedText;
+                    } catch(e) {}
+                }, 500);
+            },
+
             async add() {
                 const en = document.getElementById('in-en').value.trim(), vi = document.getElementById('in-vi').value.trim();
                 if(!en || !vi) return;
                 await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; DB.updateUI();
             },
+
             async batch() {
                 const lines = document.getElementById('in-batch').value.split('\n');
                 for(let l of lines) {
@@ -248,12 +228,13 @@
                 }
                 this.route('study');
             },
+
             async renderVault(v) {
                 const vocab = await DB.getVocab();
                 v.innerHTML = `
-                <div class="flex flex-col gap-2">
-                    <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-2xl outline-none font-black text-[10px] uppercase">
-                    <div id="vault-list" class="flex flex-col gap-2">
+                <div class="flex flex-col h-full gap-2">
+                    <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-2xl outline-none font-black text-[10px] uppercase mb-1">
+                    <div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-2">
                         ${vocab.reverse().map(item => `<div class="vault-card flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-h-[64px]" data-en="${item.en.toLowerCase()}" data-vi="${item.vi.toLowerCase()}">
                             <div class="text-xs font-black uppercase truncate">${item.en} <span class="text-teal-600">/ ${item.vi}</span></div>
                             <button onclick="Core.del('${item.id}')" class="text-[8px] font-black text-red-900/40 uppercase ml-2">DEL</button>
@@ -261,6 +242,7 @@
                     </div>
                 </div>`;
             },
+
             filterVault() {
                 const q = document.getElementById('vault-search').value.toLowerCase();
                 document.querySelectorAll('.vault-card').forEach(el => {
@@ -268,21 +250,24 @@
                     el.classList.toggle('hidden', !match);
                 });
             },
+
             async del(id) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); },
+
             renderData(v) {
                 v.innerHTML = `
-                <div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4"> 
+                <div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4 pb-10"> 
                     <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Deep-Ascent W</div>
                     <textarea id="w-editor" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-[10px] text-teal-500 font-mono custom-scroll outline-none mb-4 resize-none h-32">${JSON.stringify(DB.meta.W)}</textarea>
                     <button id="btn-opt" onclick="Core.optimize()" class="opt-loading w-full py-4 text-black rounded-xl font-black text-[10px] uppercase mb-2 bg-zinc-800 transition-all" style="--p: 0%">Optimize (Deep Ascent)</button>
                     <button onclick="Core.saveW()" class="w-full py-2 bg-zinc-800/50 text-zinc-400 rounded-xl font-black text-[9px] uppercase border border-zinc-800">Manual Save</button>
                 </div>
-                <div class="grid grid-cols-2 gap-3 mb-10">
+                <div class="grid grid-cols-2 gap-3 pb-10">
                     <button onclick="Core.exp()" class="py-5 bg-zinc-900 border border-zinc-800 rounded-2xl font-black text-[10px] uppercase">Export</button>
                     <button onclick="document.getElementById('file').click()" class="py-5 bg-zinc-900 border border-zinc-800 rounded-2xl font-black text-[10px] uppercase">Import</button>
                     <input type="file" id="file" class="hidden" onchange="Core.imp(this)">
                 </div>`;
             },
+
             async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Saved."); } catch(e) { alert("Error."); } },
             async exp(isAuto = false) { 
                 const v = await DB.getVocab(), a = document.createElement('a'); 
