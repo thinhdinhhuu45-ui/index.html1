@@ -2,11 +2,11 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KP STRIKER | FSRS v5 DEEP-OPT PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #000; color: #d4d4d8; overflow: hidden; }
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #000; color: #d4d4d8; overflow: hidden; margin: 0; }
         .tab-active { background: #14b8a6 !important; color: #000 !important; font-weight: 900 !important; }
         header, nav { opacity: 0.5; transition: opacity 0.3s ease; }
         header:hover, nav:hover { opacity: 1; }
@@ -14,14 +14,14 @@
         .progress-bar { position: fixed; bottom: 0; left: 0; height: 3px; background: #14b8a6; transition: width 0.3s; z-index: 50; }
         .custom-scroll::-webkit-scrollbar { display: none; }
         .opt-loading { background: linear-gradient(90deg, #14b8a6 var(--p), #27272a var(--p)); }
-        #app-container { display: flex; flex-direction: column; height: 98dvh; width: 100%; max-width: 32rem; }
-        #view { flex-grow: 1; overflow-y: auto; padding-bottom: 20px; position: relative; }
+        #app-container { display: flex; flex-direction: column; height: 100dvh; width: 100%; max-width: 32rem; margin: 0 auto; padding: 16px; box-sizing: border-box; }
+        #view { flex-grow: 1; overflow-y: auto; padding-bottom: 20px; position: relative; margin-top: 12px; }
     </style>
 </head>
-<body class="flex justify-center p-2 sm:p-4">
+<body class="flex justify-center">
     <div id="progress" class="progress-bar" style="width: 0%"></div>
     <div id="app-container">
-        <header class="bg-zinc-900/80 p-5 rounded-3xl flex justify-between items-center mb-3 border border-zinc-800 shrink-0">
+        <header class="bg-zinc-900/80 p-5 rounded-3xl flex justify-between items-center border border-zinc-800 shrink-0">
             <span class="font-black text-amber-500">🔥 <span id="streak">0</span></span>
             <div id="target-count" class="text-2xl font-black text-teal-500">0</div>
         </header>
@@ -37,6 +37,7 @@
     </div>
 
     <script>
+        // BỘ NÃO FSRS V5 - CẤM CHẠM
         const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
 
         const DB = {
@@ -94,8 +95,7 @@
             },
 
             renderStudyFrame(v) {
-                v.innerHTML = `
-                <div id="study-container" class="h-full flex flex-col">
+                v.innerHTML = `<div id="study-container" class="h-full flex flex-col">
                     <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
                         <div id="cf" class="card-side bg-zinc-900 p-8 text-center flex-grow"><h2 id="en-disp" class="text-5xl font-black uppercase"></h2></div>
                         <div id="cb" class="card-side p-8 text-center flex-grow hidden bg-zinc-900"><h2 id="vi-disp" class="text-4xl font-black text-teal-400"></h2></div>
@@ -103,26 +103,20 @@
                     <div id="ctrl" class="grid grid-cols-4 gap-2 mt-3 opacity-0 pointer-events-none transition-opacity">
                         ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-6 rounded-2xl text-[10px] font-black uppercase">${['Again','Hard','Good','Easy'][g-1]} [${g}]</button>`).join('')}
                     </div>
-                </div>
-                <div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! ✨</div>`;
+                </div><div id="empty-msg" class="hidden card-side border-dashed border-zinc-800 text-[10px] font-black text-zinc-600 uppercase">Học xong rồi nè! ✨</div>`;
             },
 
             nextCard() {
                 if(!this.state.queue.length) {
-                    const sc = document.getElementById('study-container');
-                    if(sc) sc.classList.add('hidden');
-                    const em = document.getElementById('empty-msg');
-                    if(em) em.classList.remove('hidden');
-                    document.getElementById('progress').style.width = '100%';
-                    return;
+                    const sc = document.getElementById('study-container'); if(sc) sc.classList.add('hidden');
+                    const em = document.getElementById('empty-msg'); if(em) em.classList.remove('hidden');
+                    document.getElementById('progress').style.width = '100%'; return;
                 }
-                const qItem = this.state.queue[0];
-                const item = qItem.ref || qItem;
+                const qItem = this.state.queue[0]; const item = qItem.ref || qItem;
                 this.state.fsm = 'FRONT';
                 document.getElementById('en-disp').innerText = item.en;
                 document.getElementById('vi-disp').innerText = item.vi;
-                document.getElementById('cf').classList.remove('hidden');
-                document.getElementById('cb').classList.add('hidden');
+                document.getElementById('cf').classList.remove('hidden'); document.getElementById('cb').classList.add('hidden');
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
                 document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
             },
@@ -132,24 +126,20 @@
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
-                const qItem = this.state.queue.shift();
-                const item = qItem.ref || qItem;
+                const qItem = this.state.queue.shift(); const item = qItem.ref || qItem;
                 this.calculate(item, g);
                 await DB.saveItem(item);
                 if(g === 1) this.state.queue.splice(Math.min(2, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 else if(!qItem.isDebt) this.updateStreak();
                 DB.meta.backupCount++;
                 if(DB.meta.backupCount >= 50) { DB.meta.backupCount = 0; this.exp(true); }
-                await DB.saveMeta();
-                this.nextCard();
+                await DB.saveMeta(); this.nextCard();
             },
 
             calculate(item, g) {
                 const now = Date.now();
                 const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
-                let { s, d, reps, logs = [] } = item;
-                const w = DB.meta.W;
-                logs.push({ g, t, s, d, date: now });
+                let { s, d, reps } = item; const w = DB.meta.W;
                 if (reps === 0) {
                     s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
@@ -159,22 +149,16 @@
                     if (g === 1) s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
                     else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
                 }
-                s = Math.max(0.1, isFinite(s) ? s : 0.1);
-                d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
+                s = Math.max(0.1, isFinite(s) ? s : 0.1); d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
                 let ivl = (g === 1) ? (10 / 1440) : Math.max(1, Math.round(s / Math.log(0.9) * Math.log(DB.meta.retention)));
                 if (ivl > 2) ivl = Math.round(ivl + (Math.random() * (ivl * 0.1) - ivl * 0.05));
-                Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000), logs });
+                Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000) });
             },
 
             async optimize() {
-                if (this.state.isOptimizing) return;
-                this.state.isOptimizing = true;
-                const btn = document.getElementById('btn-opt');
-                try {
-                    const vocab = await DB.getVocab();
-                    if (vocab.length < 5) { alert("Cần ít nhất 5 từ."); return; }
-                    alert("Optimize Xong!");
-                } finally { this.state.isOptimizing = false; if(btn) btn.style.setProperty('--p', '0%'); }
+                const vocab = await DB.getVocab();
+                if (vocab.length < 5) { alert("Cần ít nhất 5 từ."); return; }
+                alert("Optimize Xong!");
             },
 
             updateStreak() {
@@ -189,7 +173,7 @@
             renderNexus(p) {
                 p.innerHTML = `<div class="h-full flex flex-col gap-3">
                     <div class="bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 flex flex-col gap-2">
-                        <input id="in-en" oninput="Core.translate()" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
+                        <input id="in-en" autocomplete="off" placeholder="WORD" class="w-full p-4 bg-zinc-800 text-white rounded-2xl outline-none font-black text-2xl uppercase">
                         <input id="in-vi" autocomplete="off" placeholder="MEANING" class="w-full p-4 bg-zinc-800 text-teal-500 rounded-2xl outline-none font-bold">
                         <button onclick="Core.add()" class="bg-teal-500 text-black py-4 rounded-2xl font-black uppercase text-[10px]">Add</button>
                     </div>
@@ -198,23 +182,10 @@
                 </div>`;
             },
 
-            async translate() {
-                const en = document.getElementById('in-en').value.trim();
-                if(en.length < 2) return;
-                clearTimeout(this.state.t_tm);
-                this.state.t_tm = setTimeout(async () => {
-                    try {
-                        const res = await fetch(`https://api.mymemory.translated.net/get?q=${en}&langpair=en|vi`);
-                        const data = await res.json();
-                        if(data.responseData.translatedText) document.getElementById('in-vi').value = data.responseData.translatedText;
-                    } catch(e) {}
-                }, 500);
-            },
-
             async add() {
                 const en = document.getElementById('in-en').value.trim(), vi = document.getElementById('in-vi').value.trim();
                 if(!en || !vi) return;
-                await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
+                await DB.saveItem({ id: crypto.randomUUID(), en, vi, next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0 });
                 document.getElementById('in-en').value = ''; document.getElementById('in-vi').value = ''; DB.updateUI();
             },
 
@@ -222,17 +193,14 @@
                 const lines = document.getElementById('in-batch').value.split('\n');
                 for(let l of lines) {
                     const m = l.match(/^(.*?)(?::|-|=)(.*)$/);
-                    if(m && m[1].trim() && m[2].trim()) {
-                        await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
-                    }
+                    if(m && m[1].trim() && m[2].trim()) await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0 });
                 }
                 this.route('study');
             },
 
             async renderVault(v) {
                 const vocab = await DB.getVocab();
-                v.innerHTML = `
-                <div class="flex flex-col h-full gap-2">
+                v.innerHTML = `<div class="flex flex-col h-full gap-2">
                     <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="w-full p-4 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-2xl outline-none font-black text-[10px] uppercase mb-1">
                     <div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-2">
                         ${vocab.reverse().map(item => `<div class="vault-card flex justify-between items-center p-4 bg-zinc-900 border border-zinc-800 rounded-2xl min-h-[64px]" data-en="${item.en.toLowerCase()}" data-vi="${item.vi.toLowerCase()}">
@@ -245,20 +213,16 @@
 
             filterVault() {
                 const q = document.getElementById('vault-search').value.toLowerCase();
-                document.querySelectorAll('.vault-card').forEach(el => {
-                    const match = el.dataset.en.includes(q) || el.dataset.vi.includes(q);
-                    el.classList.toggle('hidden', !match);
-                });
+                document.querySelectorAll('.vault-card').forEach(el => el.classList.toggle('hidden', !(el.dataset.en.includes(q) || el.dataset.vi.includes(q))));
             },
 
             async del(id) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); },
 
             renderData(v) {
-                v.innerHTML = `
-                <div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4 pb-10"> 
+                v.innerHTML = `<div class="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 mb-4 pb-10"> 
                     <div class="text-[10px] font-black text-zinc-500 uppercase mb-4 text-center">FSRS v5 Deep-Ascent W</div>
                     <textarea id="w-editor" class="w-full bg-black border border-zinc-800 p-4 rounded-xl text-[10px] text-teal-500 font-mono custom-scroll outline-none mb-4 resize-none h-32">${JSON.stringify(DB.meta.W)}</textarea>
-                    <button id="btn-opt" onclick="Core.optimize()" class="opt-loading w-full py-4 text-black rounded-xl font-black text-[10px] uppercase mb-2 bg-zinc-800 transition-all" style="--p: 0%">Optimize (Deep Ascent)</button>
+                    <button onclick="Core.optimize()" class="w-full py-4 text-black rounded-xl font-black text-[10px] uppercase mb-2 bg-teal-500">Optimize (Ready)</button>
                     <button onclick="Core.saveW()" class="w-full py-2 bg-zinc-800/50 text-zinc-400 rounded-xl font-black text-[9px] uppercase border border-zinc-800">Manual Save</button>
                 </div>
                 <div class="grid grid-cols-2 gap-3 pb-10">
@@ -289,7 +253,7 @@
             if(['a','s','d','f'].includes(k)) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
             if(Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
-                if(Core.state.fsm === 'BACK' && ['1','2','3','4'].includes(k)) { Core.ans(parseInt(k)); }
+                if(Core.state.fsm === 'BACK' && ['1','2','3','4'].includes(k)) Core.ans(parseInt(k));
             }
         };
 
