@@ -3,34 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KP STRIKER | FSRS v5 ULTIMATE</title>
+    <title>KP STRIKER | FSRS v5 CORE-SYNC</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #050505; color: #d4d4d8; margin: 0; display: flex; justify-content: center; min-height: 100vh; }
+        body { font-family: ui-sans-serif, system-ui, sans-serif; background: #050505; color: #d4d4d8; margin: 0; display: flex; justify-content: center; min-height: 100vh; overflow: hidden; }
         .tab-active { background: #14b8a6 !important; color: #000 !important; font-weight: 900 !important; transform: scale(1.05); }
         .card-side { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; border-radius: 40px; width: 100%; border: 1px solid #14b8a622; background: #0f0f0f; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
         .progress-bar { position: fixed; top: 0; left: 0; height: 4px; background: #14b8a6; transition: width 0.3s; z-index: 100; box-shadow: 0 0 10px #14b8a6; }
         .custom-scroll::-webkit-scrollbar { display: none; }
-        
-        #app-container { 
-            display: flex; flex-direction: column; 
-            height: 100dvh; width: 100%; 
-            max-width: 800px; 
-            padding: 20px; box-sizing: border-box; 
-        }
-        
+        #app-container { display: flex; flex-direction: column; height: 100dvh; width: 100%; max-width: 800px; padding: 20px; box-sizing: border-box; }
         #view { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; margin: 20px 0; }
-        
-        .w-code-box {
-            font-family: 'ui-monospace', 'SFMono-Regular', Menlo, monospace;
-            word-break: break-word; 
-            white-space: pre-wrap;
-            line-height: 1.8;
-            letter-spacing: 0.05em;
-        }
-
-        button { transition: all 0.2s ease; }
+        .w-code-box { font-family: 'ui-monospace', 'SFMono-Regular', Menlo, monospace; word-break: break-word; white-space: pre-wrap; line-height: 1.6; font-size: 11px; }
+        button { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         button:active { transform: scale(0.95); }
+        .leech-warn { color: #ef4444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; margin-top: 10px; border: 1px solid #ef444444; padding: 4px 12px; border-radius: 999px; }
+        .forecast-bar { transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
     </style>
 </head>
 <body>
@@ -55,11 +42,13 @@
     </div>
 
     <script>
-        const DEFAULT_W = [0.4022, 0.9485, 2.5157, 14.2658, 4.9157, 1.0567, 0.9313, 0.0151, 1.636, 0.137, 1.0114, 2.21, 0.0805, 0.3125, 2.1226, 0.2464, 2.107, 0.5046, 0.9347];
+        const DEFAULT_W = [0.4, 0.9, 2.5, 14.2, 4.9, 1.0, 0.9, 0.01, 1.6, 0.1, 1.0, 2.2, 0.08, 0.3, 2.1, 0.2, 2.1, 0.5, 0.9];
         
         const DB = {
             idb: null,
-            meta: { streak: 0, lastDate: null, retention: 0.9, W: [...DEFAULT_W], backupCount: 0 },
+            meta: { streak: 0, lastDate: null, retention: 0.9, desired_retention: 0.9, W: [...DEFAULT_W], backupCount: 0, totalRev: 0, successRev: 0 },
+            writeBuffer: new Map(),
+            
             async init() {
                 return new Promise(res => {
                     const req = indexedDB.open("KP_STRIKER_V5_DEEP", 1);
@@ -76,11 +65,26 @@
                     };
                 });
             },
-            async getVocab() { return new Promise(r => this.idb.transaction("vocab").objectStore("vocab").getAll().onsuccess = e => r(e.target.result || [])); },
-            async saveItem(item) { this.idb.transaction("vocab", "readwrite").objectStore("vocab").put(item); },
+            
+            async flush() {
+                if (this.writeBuffer.size === 0) return;
+                const tx = this.idb.transaction("vocab", "readwrite");
+                const store = tx.objectStore("vocab");
+                for (let item of this.writeBuffer.values()) store.put(item);
+                this.writeBuffer.clear();
+            },
+
+            async getVocab() { 
+                const dbItems = await new Promise(r => this.idb.transaction("vocab").objectStore("vocab").getAll().onsuccess = e => r(e.target.result || []));
+                const map = new Map(dbItems.map(i => [i.id, i]));
+                for (const [id, item] of this.writeBuffer) map.set(id, item);
+                return Array.from(map.values());
+            },
+
+            async saveItem(item) { this.writeBuffer.set(item.id, item); if (this.writeBuffer.size >= 15) this.flush(); },
             async saveMeta() { this.idb.transaction("meta", "readwrite").objectStore("meta").put(this.meta, "main"); this.updateUI(); },
             async getMeta() { return new Promise(r => this.idb.transaction("meta").objectStore("meta").get("main").onsuccess = e => r(e.target.result)); },
-            async deleteItem(id) { this.idb.transaction("vocab", "readwrite").objectStore("vocab").delete(id); },
+            async deleteItem(id) { this.writeBuffer.delete(id); this.idb.transaction("vocab", "readwrite").objectStore("vocab").delete(id); },
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
                 this.getVocab().then(v => document.getElementById('target-count').innerText = v.filter(i => i.next <= Date.now()).length);
@@ -88,19 +92,18 @@
         };
 
         const Core = {
-            state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE' },
+            state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', vaultData: [], vaultRenderCount: 50 },
+            
             async route(v) {
                 this.state.view = v;
                 document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
                 const port = document.getElementById('view'); port.innerHTML = '';
-                
                 if(v === 'study') {
                     const v_list = await DB.getVocab();
                     this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
                     this.state.initialQueueSize = this.state.queue.length;
                     this.renderStudyFrame(port); this.nextCard();
-                } 
-                else if(v === 'nexus') this.renderNexus(port);
+                } else if(v === 'nexus') this.renderNexus(port);
                 else if(v === 'vault') this.renderVault(port);
                 else if(v === 'data') this.renderData(port);
             },
@@ -108,13 +111,16 @@
             renderStudyFrame(v) {
                 v.innerHTML = `<div id="study-container" class="h-full flex flex-col justify-between">
                     <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
-                        <div id="cf" class="card-side p-12 text-center flex-grow"><h2 id="en-disp" class="text-6xl font-black uppercase tracking-tighter text-white"></h2></div>
-                        <div id="cb" class="card-side p-12 text-center flex-grow hidden"><h2 id="vi-disp" class="text-4xl font-black text-teal-400"></h2></div>
+                        <div id="cf" class="card-side p-8 text-center flex-grow"><h2 id="en-disp" class="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white break-all"></h2></div>
+                        <div id="cb" class="card-side p-8 text-center flex-grow hidden">
+                            <h2 id="vi-disp" class="text-3xl font-black text-teal-400 break-words"></h2>
+                            <div id="leech-tag" class="leech-warn hidden">☠️ LEECH</div>
+                        </div>
                     </div>
                     <div id="ctrl" class="grid grid-cols-4 gap-3 mt-6 opacity-0 pointer-events-none transition-all transform translate-y-4">
-                        ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-8 rounded-[2rem] text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 text-zinc-400">${['Again','Hard','Good','Easy'][g-1]}</button>`).join('')}
+                        ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-8 rounded-[2rem] text-[10px] font-black uppercase tracking-widest text-zinc-400">${['Again','Hard','Good','Easy'][g-1]}</button>`).join('')}
                     </div>
-                </div><div id="empty-msg" class="hidden card-side border-2 border-dashed border-zinc-800 text-sm font-black text-zinc-600 uppercase tracking-[0.2em]">All Clear! ✨</div>`;
+                </div><div id="empty-msg" class="hidden card-side border-2 border-dashed border-zinc-800 text-sm font-black text-zinc-600 uppercase tracking-[0.2em]">All Clear</div>`;
             },
 
             nextCard() {
@@ -126,166 +132,181 @@
                 const qItem = this.state.queue[0]; const item = qItem.ref || qItem;
                 this.state.fsm = 'FRONT';
                 document.getElementById('en-disp').innerText = item.en; document.getElementById('vi-disp').innerText = item.vi;
+                document.getElementById('leech-tag').classList.toggle('hidden', !item.leech);
                 document.getElementById('cf').classList.remove('hidden'); document.getElementById('cb').classList.add('hidden');
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
                 document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
             },
 
-            flip() { 
-                if(this.state.fsm === 'FRONT') { 
-                    this.state.fsm = 'BACK'; 
-                    document.getElementById('cf').classList.add('hidden'); 
-                    document.getElementById('cb').classList.remove('hidden'); 
-                    document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4'); 
-                } 
-            },
+            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4'); } },
 
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
                 const qItem = this.state.queue.shift(); const item = qItem.ref || qItem;
-                this.calculate(item, g);
+                if (g === 1 && !qItem.isDebt) { item.againCount = (item.againCount || 0) + 1; if (item.againCount >= 8) item.leech = true; }
+                
+                // Ghi log để phục vụ Optimizer
+                const t = item.lastReview ? Math.max(0, Math.floor((Date.now() - item.lastReview) / 86400000)) : 0;
+                if(!item.logs) item.logs = [];
+                item.logs.push({ g, t }); // Chỉ lưu Rating và Thời gian trôi qua để Worker tính lại từ đầu
+
+                this.calculate(item, g, t);
+                if(!qItem.isDebt) {
+                    DB.meta.totalRev = (DB.meta.totalRev || 0) + 1;
+                    if(g >= 2) DB.meta.successRev = (DB.meta.successRev || 0) + 1;
+                    this.updateStreak();
+                }
                 await DB.saveItem(item);
-                if(g === 1) this.state.queue.splice(Math.min(2, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
-                else if(!qItem.isDebt) this.updateStreak();
-                DB.meta.backupCount++;
-                if(DB.meta.backupCount >= 50) { DB.meta.backupCount = 0; this.exp(true); }
+                if(g === 1) this.state.queue.splice(Math.min(10, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 await DB.saveMeta(); this.nextCard();
             },
 
-            calculate(item, g) {
-                const now = Date.now();
-                const t = item.lastReview ? Math.max(1, Math.floor((now - item.lastReview) / 86400000)) : 0;
-                let { s, d, reps, logs = [] } = item; const w = DB.meta.W;
-                logs.push({ g, t, s, d, date: now });
+            calculate(item, g, t) {
+                let { s, d, reps } = item; const w = DB.meta.W;
+                const r = reps > 0 ? Math.exp(Math.log(0.9) * t / s) : 1;
                 if (reps === 0) {
                     s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
-                    const r = Math.exp(Math.log(0.9) * (t / s));
                     d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
-                    d = w[4] * (1 - w[7]) + d * w[7];
+                    d = w[4] * (1 - w[7]) + d * w[7]; 
                     if (g === 1) s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
-                    else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * (g === 2 ? w[15] : 1) * (g === 4 ? w[16] : 1));
+                    else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * ((g === 2) ? w[15] : (g === 4 ? w[16] : 1)));
                 }
                 s = Math.max(0.1, isFinite(s) ? s : 0.1); d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                let ivl = (g === 1) ? (10 / 1440) : Math.max(1, Math.round(s / Math.log(0.9) * Math.log(DB.meta.retention)));
-                
-                // --- KỊCH BẢN XẤU NHẤT ---
-                const deadLine = Math.round(s * (Math.log(0.1) / Math.log(0.9)));
-                console.log(`%c[DỰ BÁO] "${item.en}":`, "color: #14b8a6; font-weight: bold");
-                console.log(`- Kịch bản đẹp: +${ivl} ngày nữa học lại.`);
-                console.log(`- Kịch bản xấu: Quên sạch sau ${deadLine} ngày nếu bỏ học.`);
-
-                if (ivl > 2) ivl = Math.round(ivl + (Math.random() * (ivl * 0.1) - ivl * 0.05));
-                Object.assign(item, { s, d, reps: reps + 1, lastReview: now, next: now + (ivl * 86400000), logs });
+                const ivl = (g === 1) ? Math.min(s, 0.5) : s * (Math.pow(DB.meta.desired_retention, -1/0.9) - 1) * 9;
+                Object.assign(item, { s, d, reps: reps + 1, lastReview: Date.now(), next: Date.now() + (Math.max(0.005, ivl) * 86400000) });
             },
 
             updateStreak() {
-                const ds = new Date().toDateString();
-                if(DB.meta.lastDate !== ds) {
-                    const l = new Date(DB.meta.lastDate);
-                    DB.meta.streak = (new Date()-l < 172800000) ? DB.meta.streak+1 : 1;
-                    DB.meta.lastDate = ds;
-                }
+                const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                const last = DB.meta.lastDate ? new Date(DB.meta.lastDate).getTime() : 0;
+                const diff = (today - last) / 86400000;
+                if (diff === 1) { DB.meta.streak++; DB.meta.lastDate = now.toDateString(); } 
+                else if (diff > 1 || !DB.meta.lastDate) { DB.meta.streak = 1; DB.meta.lastDate = now.toDateString(); }
             },
 
             renderNexus(p) {
-                p.innerHTML = `<div class="h-full flex flex-col gap-6">
-                    <div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner">
-                        <div class="text-[10px] font-black text-zinc-500 uppercase mb-6 tracking-[0.3em] text-center">Batch Import Engine</div>
-                        <textarea id="in-batch" placeholder="word:meaning&#10;hello:xin chào" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl custom-scroll resize-none placeholder:text-zinc-800"></textarea>
-                    </div>
-                    <button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm shadow-xl shadow-teal-500/10">Nạp vào kho lưu trữ</button>
-                </div>`;
+                p.innerHTML = `<div class="h-full flex flex-col gap-6"><div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner"><textarea id="in-batch" placeholder="word:meaning" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl resize-none placeholder:text-zinc-800"></textarea></div><button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm">Nạp từ mới</button></div>`;
             },
 
             async batch() {
-                const raw = document.getElementById('in-batch').value;
-                if(!raw.trim()) return;
-                const lines = raw.split('\n');
-                for(let l of lines) {
+                const raw = document.getElementById('in-batch').value; if(!raw.trim()) return;
+                const vocab = await DB.getVocab(); const existing = new Set(vocab.map(i => i.en.toLowerCase()));
+                for(let l of raw.split('\n')) {
                     const m = l.match(/^(.*?)(?::|-|=)(.*)$/);
-                    if(m && m[1].trim() && m[2].trim()) await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] });
+                    if(m && !existing.has(m[1].trim().toLowerCase())) await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [], againCount: 0, leech: false });
                 }
                 document.getElementById('in-batch').value = ''; DB.updateUI(); this.route('study');
             },
 
             async renderVault(v) {
-                const vocab = await DB.getVocab();
-                v.innerHTML = `<div class="flex flex-col h-full gap-4">
-                    <div class="grid grid-cols-2 gap-3">
-                        <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase shadow-2xl">
-                        <button onclick="Core.clearAll()" class="bg-red-900/20 border border-red-900/50 text-red-500 rounded-3xl font-black text-[10px] uppercase hover:bg-red-500 hover:text-white transition-all">Clear All Vault</button>
-                    </div>
-                    <div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-3">
-                        ${vocab.reverse().map(item => `<div class="vault-card flex justify-between items-center p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem] hover:border-teal-900/50 transition-colors" data-en="${item.en.toLowerCase()}" data-vi="${item.vi.toLowerCase()}">
-                            <div class="text-sm font-black uppercase truncate text-zinc-300">${item.en} <span class="text-teal-700 mx-2">//</span> <span class="text-zinc-500">${item.vi}</span></div>
-                            <button onclick="Core.del('${item.id}')" class="text-[9px] font-black text-red-900/40 hover:text-red-500 uppercase p-2">Delete</button>
-                        </div>`).join('')}
-                    </div>
-                </div>`;
+                const vocab = await DB.getVocab(); this.state.vaultData = vocab.reverse();
+                v.innerHTML = `<div class="flex flex-col h-full gap-4"><input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH..." class="p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase"><div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-3 pb-6"></div></div>`;
+                this.renderVaultItems();
             },
 
-            filterVault() {
-                const q = document.getElementById('vault-search').value.toLowerCase();
-                document.querySelectorAll('.vault-card').forEach(el => el.classList.toggle('hidden', !(el.dataset.en.includes(q) || el.dataset.vi.includes(q))));
+            renderVaultItems() {
+                const list = document.getElementById('vault-list'); if(!list) return;
+                const q = (document.getElementById('vault-search')?.value || '').toLowerCase();
+                list.innerHTML = this.state.vaultData.filter(i => i.en.toLowerCase().includes(q) || i.vi.toLowerCase().includes(q)).slice(0, 100).map(item => `<div class="flex justify-between items-center p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem]"><div class="text-sm font-black uppercase truncate text-zinc-300">${item.en} <span class="text-teal-700">//</span> ${item.vi}</div><button onclick="Core.del('${item.id}')" class="text-[9px] font-black text-red-900/40 uppercase p-2">Del</button></div>`).join('');
             },
 
-            async del(id) { if(confirm('Xóa từ này?')) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); } },
+            filterVault() { this.renderVaultItems(); },
+            async del(id) { if(confirm('Xóa?')) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); } },
 
-            async clearAll() {
-                if(confirm('CẢNH BÁO: Xóa SẠCH TẤT CẢ từ vựng?')) {
-                    const vocab = await DB.getVocab();
-                    for(let item of vocab) await DB.deleteItem(item.id);
-                    this.route('vault'); DB.updateUI();
-                }
-            },
-
-            renderData(v) {
-                v.innerHTML = `<div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6 flex-grow flex flex-col shadow-2xl"> 
-                    <div class="text-[10px] font-black text-zinc-500 uppercase mb-6 tracking-[0.3em] text-center">FSRS v5 Deep-Ascent W</div>
-                    <div class="bg-black/50 p-6 rounded-3xl border border-zinc-800/50 flex-grow mb-6 overflow-hidden">
-                        <textarea id="w-editor" class="w-full h-full bg-transparent text-teal-500 w-code-box text-sm outline-none resize-none custom-scroll">${JSON.stringify(DB.meta.W).replace(/,/g, ', ')}</textarea>
-                    </div>
-                    <button onclick="Core.optimizeW()" class="w-full py-6 text-black rounded-[2rem] font-black text-xs uppercase mb-3 bg-teal-500 shadow-lg shadow-teal-500/20">Optimize (Logs Active)</button>
-                    <button onclick="Core.saveW()" class="w-full py-4 bg-zinc-800/50 text-zinc-500 rounded-2xl font-black text-[10px] uppercase border border-zinc-800">Manual Save</button>
+            async renderData(v) {
+                const vocab = await DB.getVocab(), todayStart = new Date().setHours(0,0,0,0);
+                const forecast = new Array(7).fill(0); vocab.forEach(item => { const d = Math.floor((item.next - todayStart) / 86400000); if (d >= 0 && d < 7) forecast[d]++; });
+                const maxVal = Math.max(...forecast, 1);
+                
+                v.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center shadow-2xl"><div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">True Retention</div><div class="text-2xl font-black text-teal-500">${DB.meta.totalRev ? (DB.meta.successRev / DB.meta.totalRev * 100).toFixed(1) : 0}%</div></div>
+                    <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center shadow-2xl"><div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Desired</div><div class="text-2xl font-black text-zinc-400">${(DB.meta.desired_retention*100).toFixed(0)}%</div></div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 pb-4">
-                    <button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export JSON</button>
-                    <button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import JSON</button>
-                    <input type="file" id="file" class="hidden" onchange="Core.imp(this)">
-                </div>`;
+                <div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6 shadow-2xl"><div class="flex items-end justify-between h-32 px-2">${forecast.map((count, i) => `<div class="flex flex-col items-center gap-2 w-full"><span class="text-[8px] font-bold text-zinc-600">${count}</span><div class="forecast-bar w-4 bg-teal-500/20 rounded-t-lg border-t border-teal-500/50" style="height: ${(count/maxVal)*100}%"></div><span class="text-[8px] font-black text-zinc-500 uppercase">${i === 0 ? 'TOD' : 'D+'+i}</span></div>`).join('')}</div></div>
+                <div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6 flex-grow flex flex-col shadow-2xl"> 
+                    <div class="bg-black/50 p-6 rounded-3xl border border-zinc-800/50 flex-grow mb-6 overflow-hidden"><textarea id="w-editor" class="w-full h-full bg-transparent text-teal-500 w-code-box outline-none resize-none custom-scroll">${JSON.stringify(DB.meta.W).replace(/,/g, ', ')}</textarea></div>
+                    <button id="btn-opt" onclick="Core.optimizeW()" class="w-full py-6 text-black rounded-[2rem] font-black text-xs uppercase mb-3 bg-teal-500">Optimize FSRS v5 (Deep Simulation)</button>
+                    <button onclick="Core.saveW()" class="w-full py-4 bg-zinc-800/50 text-zinc-500 rounded-2xl font-black text-[10px] uppercase">Save Manual</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4 pb-4"><button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button><button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button><input type="file" id="file" class="hidden" onchange="Core.imp(this)"></div>`;
             },
 
-            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Đã cập nhật bộ não FSRS!"); } catch(e) { alert("Lỗi cấu trúc mảng W!"); } },
+            async saveW() { try { DB.meta.W = JSON.parse(document.getElementById('w-editor').value); await DB.saveMeta(); alert("Done"); } catch(e) { alert("Err"); } },
             
             async optimizeW() {
-                const v = await DB.getVocab();
-                const totalLogs = v.reduce((acc, item) => acc + (item.logs ? item.logs.length : 0), 0);
-                if(totalLogs < 50) return alert(`Chưa đủ dữ liệu (Hiện có ${totalLogs} logs). Hãy học thêm!`);
-                const failRate = v.reduce((acc, item) => acc + (item.logs ? item.logs.filter(l => l.g === 1).length : 0), 0) / totalLogs;
-                DB.meta.W[4] += failRate > 0.1 ? -0.1 : 0.05;
-                DB.meta.W = DB.meta.W.map(w => parseFloat((w * (0.98 + Math.random() * 0.04)).toFixed(4)));
-                await DB.saveMeta(); this.route('data'); alert(`Đã tối ưu bộ não dựa trên ${totalLogs} logs!`);
+                const vocab = await DB.getVocab();
+                // Chỉ lấy những thẻ có ít nhất 1 log
+                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length > 0).map(v => ({ logs: v.logs }));
+                if(cardsWithLogs.length < 10) return alert("Need more data (10+ cards)");
+                
+                const btn = document.getElementById('btn-opt'); btn.innerText = 'SIMULATING...'; btn.classList.add('opacity-50', 'pointer-events-none');
+                
+                const workerCode = `
+                    self.onmessage = function(e) {
+                        const { w, cardLogs, epochs } = e.data;
+                        let currentW = [...w];
+                        const eps = 1e-4, alpha = 0.01;
+
+                        function getLoss(testW) {
+                            let logLoss = 0, count = 0;
+                            cardLogs.forEach(card => {
+                                let s = 0, d = 0, reps = 0;
+                                card.logs.forEach(log => {
+                                    const { g, t } = log;
+                                    const y = g === 1 ? 0 : 1;
+                                    if (reps > 0) {
+                                        const r = Math.exp(Math.log(0.9) * t / s);
+                                        const p = Math.min(Math.max(r, 0.001), 0.999);
+                                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
+                                        count++;
+                                        // Update S, D ảo để tính log tiếp theo của cùng thẻ đó
+                                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
+                                        d = testW[4] * (1 - testW[7]) + d * testW[7];
+                                        if (g === 1) s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
+                                        else s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * ((g === 2) ? testW[15] : (g === 4 ? testW[16] : 1)));
+                                    } else {
+                                        s = testW[g - 1]; d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
+                                    }
+                                    reps++; s = Math.max(0.1, s);
+                                });
+                            });
+                            return logLoss / (count || 1);
+                        }
+
+                        for (let e = 0; e < epochs; e++) {
+                            let grads = new Array(19).fill(0);
+                            const baseLoss = getLoss(currentW);
+                            for (let j = 0; j < 19; j++) {
+                                let tempW = [...currentW]; tempW[j] += eps;
+                                grads[j] = (getLoss(tempW) - baseLoss) / eps;
+                            }
+                            for (let j = 0; j < 19; j++) {
+                                currentW[j] -= alpha * grads[j];
+                                currentW[j] = Math.max(0.001, parseFloat(currentW[j].toFixed(4)));
+                            }
+                        }
+                        self.postMessage({ w: currentW });
+                    };
+                `;
+                
+                const worker = new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
+                worker.onmessage = async (e) => {
+                    DB.meta.W = e.data.w; await DB.saveMeta(); 
+                    btn.innerText = 'Optimize FSRS v5 (Deep Simulation)'; btn.classList.remove('opacity-50', 'pointer-events-none');
+                    this.route('data'); alert("AI Re-trained!"); worker.terminate();
+                };
+                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 10 });
             },
 
-            async exp(isAuto = false) { 
-                const v = await DB.getVocab(), a = document.createElement('a'); 
-                a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'}));
-                a.download = isAuto ? `AUTO_BACKUP.json` : `STRIKER_V5.json`; a.click();
-            },
-
-            imp(el) {
-                const r = new FileReader(); r.onload = async e => {
-                    const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta();
-                    for(let i of d.v) await DB.saveItem(i); location.reload();
-                }; r.readAsText(el.files[0]);
-            }
+            async exp() { const v = await DB.getVocab(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'})); a.download = `STRIKER_V5.json`; a.click(); },
+            imp(el) { const r = new FileReader(); r.onload = async e => { const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta(); for(let i of d.v) await DB.saveItem(i); location.reload(); }; r.readAsText(el.files[0]); }
         };
 
         window.onkeydown = e => {
-            const foc = document.activeElement.id, tag = document.activeElement.tagName;
-            if(['w-editor', 'in-batch', 'vault-search'].includes(foc) || tag === 'TEXTAREA' || tag === 'INPUT') return;
+            const foc = document.activeElement.id; if(['w-editor', 'in-batch', 'vault-search'].includes(foc)) return;
             const k = e.key.toLowerCase();
             if(['a','s','d','f'].includes(k)) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
             if(Core.state.view === 'study' && Core.state.queue.length) {
