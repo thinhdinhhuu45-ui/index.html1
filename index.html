@@ -12,17 +12,15 @@
         .progress-bar { position: fixed; top: 0; left: 0; height: 4px; background: #14b8a6; transition: width 0.3s; z-index: 100; box-shadow: 0 0 10px #14b8a6; }
         .custom-scroll::-webkit-scrollbar { display: none; }
         
-        /* Responsive Container */
         #app-container { 
             display: flex; flex-direction: column; 
             height: 100dvh; width: 100%; 
-            max-width: 800px; /* Nới rộng cho máy tính */
+            max-width: 800px; 
             padding: 20px; box-sizing: border-box; 
         }
         
         #view { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; margin: 20px 0; }
         
-        /* Fix tràn chữ cho mảng W (Đã sửa ở đây nha) */
         .w-code-box {
             font-family: 'ui-monospace', 'SFMono-Regular', Menlo, monospace;
             word-break: break-word; 
@@ -208,7 +206,10 @@
             async renderVault(v) {
                 const vocab = await DB.getVocab();
                 v.innerHTML = `<div class="flex flex-col h-full gap-4">
-                    <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="w-full p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase mb-2 shadow-2xl">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH VAULT..." class="p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase shadow-2xl">
+                        <button onclick="Core.clearAll()" class="bg-red-900/20 border border-red-900/50 text-red-500 rounded-3xl font-black text-[10px] uppercase hover:bg-red-500 hover:text-white transition-all">Clear All Vault</button>
+                    </div>
                     <div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-3">
                         ${vocab.reverse().map(item => `<div class="vault-card flex justify-between items-center p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem] hover:border-teal-900/50 transition-colors" data-en="${item.en.toLowerCase()}" data-vi="${item.vi.toLowerCase()}">
                             <div class="text-sm font-black uppercase truncate text-zinc-300">${item.en} <span class="text-teal-700 mx-2">//</span> <span class="text-zinc-500">${item.vi}</span></div>
@@ -224,6 +225,14 @@
             },
 
             async del(id) { if(confirm('Xóa từ này?')) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); } },
+
+            async clearAll() {
+                if(confirm('CẢNH BÁO: Xóa SẠCH TẤT CẢ từ vựng?')) {
+                    const vocab = await DB.getVocab();
+                    for(let item of vocab) await DB.deleteItem(item.id);
+                    this.route('vault'); DB.updateUI();
+                }
+            },
 
             renderData(v) {
                 v.innerHTML = `<div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6 flex-grow flex flex-col shadow-2xl"> 
