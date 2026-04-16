@@ -224,25 +224,33 @@
                                         const p = Math.min(Math.max(r, 0.001), 0.999);
                                         logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
                                         count++;
+
                                         d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
                                         d = testW[4] * (1 - testW[7]) + d * testW[7];
-                                        if (g === 1) s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
-                                        else s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(testW, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * ((g === 2) ? testW[15] : (g === 4 ? testW[16] : 1)));
+
+                                        if (g === 1) {
+                                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
+                                        } else {
+                                            const bonus = (g === 2) ? testW[15] : (g === 4 ? testW[16] : 1);
+                                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * bonus);
+                                        }
                                     } else {
-                                        s = testW[g - 1]; d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
+                                        s = testW[g - 1]; 
+                                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
                                     }
-                                    reps++; s = Math.max(0.1, s);
+                                    reps++; 
+                                    s = Math.max(0.1, s);
                                 });
                             });
                             return logLoss / (count || 1);
                         }
 
-                        // TỐI ƯU 1: 50 Epochs để hội tụ tốt nhất
                         for (let e = 0; e < epochs; e++) {
                             let grads = new Array(19).fill(0);
                             const baseLoss = getLoss(currentW);
                             for (let j = 0; j < 19; j++) {
-                                let tempW = [...currentW]; tempW[j] += eps;
+                                let tempW = [...currentW]; 
+                                tempW[j] += eps;
                                 grads[j] = (getLoss(tempW) - baseLoss) / eps;
                             }
                             for (let j = 0; j < 19; j++) {
