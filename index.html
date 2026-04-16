@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KP STRIKER | FSRS v5 AUTOPILOT</title>
+    <title>KP STRIKER V5.2 | FULL ENGINE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: ui-sans-serif, system-ui, sans-serif; background: #050505; color: #d4d4d8; margin: 0; display: flex; justify-content: center; min-height: 100vh; overflow: hidden; }
@@ -13,13 +13,10 @@
         .custom-scroll::-webkit-scrollbar { display: none; }
         #app-container { display: flex; flex-direction: column; height: 100dvh; width: 100%; max-width: 800px; padding: 20px; box-sizing: border-box; }
         #view { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; margin: 20px 0; }
-        .w-code-box { font-family: 'ui-monospace', monospace; word-break: break-word; white-space: pre-wrap; line-height: 1.6; font-size: 11px; }
-        button { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        button:active { transform: scale(0.95); }
-        .forecast-bar { transition: height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .sync-indicator { font-size: 10px; font-weight: 900; color: #14b8a6; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.3s; }
         .syncing { opacity: 1; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+        input[type=range] { accent-color: #14b8a6; }
     </style>
 </head>
 <body>
@@ -51,7 +48,7 @@
         
         const DB = {
             idb: null,
-            meta: { streak: 0, lastDate: null, retention: 0.8924, desired_retention: 0.8924, W: [...DEFAULT_W], backupCount: 0, totalRev: 0, successRev: 0, sessionReviews: 0 },
+            meta: { streak: 0, lastDate: null, desired_retention: 0.9, W: [...DEFAULT_W], totalRev: 0, successRev: 0, sessionReviews: 0 },
             writeBuffer: new Map(),
             
             async init() {
@@ -73,36 +70,51 @@
             
             async flush() {
                 if (this.writeBuffer.size === 0) return;
-                const tx = this.idb.transaction("vocab", "readwrite");
-                const store = tx.objectStore("vocab");
-                for (let item of this.writeBuffer.values()) store.put(item);
-                this.writeBuffer.clear();
+                return new Promise((res) => {
+                    const tx = this.idb.transaction("vocab", "readwrite");
+                    const store = tx.objectStore("vocab");
+                    for (let item of this.writeBuffer.values()) store.put(item);
+                    this.writeBuffer.clear();
+                    tx.oncomplete = () => res();
+                });
             },
 
             async getVocab() { 
-                const dbItems = await new Promise(r => this.idb.transaction("vocab").objectStore("vocab").getAll().onsuccess = e => r(e.target.result || []));
-                const map = new Map(dbItems.map(i => [i.id, i]));
-                for (const [id, item] of this.writeBuffer) map.set(id, item);
-                return Array.from(map.values());
+                await this.flush(); 
+                return new Promise(r => this.idb.transaction("vocab").objectStore("vocab").getAll().onsuccess = e => r(e.target.result || []));
             },
 
-            async saveItem(item) { this.writeBuffer.set(item.id, item); if (this.writeBuffer.size >= 15) this.flush(); },
-            async saveMeta() { this.idb.transaction("meta", "readwrite").objectStore("meta").put(this.meta, "main"); this.updateUI(); },
+            async saveItem(item) { 
+                this.writeBuffer.set(item.id, item); 
+                if (this.writeBuffer.size >= 10) await this.flush(); 
+            },
+
+            async saveMeta() { 
+                this.idb.transaction("meta", "readwrite").objectStore("meta").put(this.meta, "main");
+                this.updateUI();
+            },
+
             async getMeta() { return new Promise(r => this.idb.transaction("meta").objectStore("meta").get("main").onsuccess = e => r(e.target.result)); },
             async deleteItem(id) { this.writeBuffer.delete(id); this.idb.transaction("vocab", "readwrite").objectStore("vocab").delete(id); },
             updateUI() {
                 document.getElementById('streak').innerText = this.meta.streak;
-                this.getVocab().then(v => document.getElementById('target-count').innerText = v.filter(i => i.next <= Date.now()).length);
+                this.getVocab().then(v => {
+                    document.getElementById('target-count').innerText = v.filter(i => i.next <= Date.now()).length;
+                });
             }
         };
 
+        window.addEventListener('beforeunload', () => DB.flush());
+
         const Core = {
-            state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', isOptimizing: false },
+            state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', isOptimizing: false, vaultData: [] },
             
             async route(v) {
+                await DB.flush();
                 this.state.view = v;
                 document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
                 const port = document.getElementById('view'); port.innerHTML = '';
+                
                 if(v === 'study') {
                     const v_list = await DB.getVocab();
                     this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
@@ -116,10 +128,10 @@
             renderStudyFrame(v) {
                 v.innerHTML = `<div id="study-container" class="h-full flex flex-col justify-between">
                     <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
-                        <div id="cf" class="card-side p-8 text-center flex-grow"><h2 id="en-disp" class="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white break-all"></h2></div>
+                        <div id="cf" class="card-side p-8 text-center flex-grow"><h2 id="en-disp" class="text-4xl font-black uppercase tracking-tighter text-white break-all"></h2></div>
                         <div id="cb" class="card-side p-8 text-center flex-grow hidden"><h2 id="vi-disp" class="text-3xl font-black text-teal-400 break-words"></h2></div>
                     </div>
-                    <div id="ctrl" class="grid grid-cols-4 gap-3 mt-6 opacity-0 pointer-events-none transition-all transform translate-y-4">
+                    <div id="ctrl" class="grid grid-cols-4 gap-3 mt-6 opacity-0 pointer-events-none transition-all">
                         ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-8 rounded-[2rem] text-[10px] font-black uppercase text-zinc-400">${['Again','Hard','Good','Easy'][g-1]}</button>`).join('')}
                     </div>
                 </div><div id="empty-msg" class="hidden card-side border-2 border-dashed border-zinc-800 text-sm font-black text-zinc-600 uppercase tracking-[0.2em]">All Clear</div>`;
@@ -130,49 +142,48 @@
                     const sc = document.getElementById('study-container'); if(sc) sc.classList.add('hidden');
                     const em = document.getElementById('empty-msg'); if(em) em.classList.remove('hidden');
                     document.getElementById('progress').style.width = '100%';
-                    // TỐI ƯU 2: Tự động chạy khi hết hàng chờ
-                    await this.optimizeW(true);
                     return;
                 }
                 const qItem = this.state.queue[0]; const item = qItem.ref || qItem;
                 this.state.fsm = 'FRONT';
                 document.getElementById('en-disp').innerText = item.en; document.getElementById('vi-disp').innerText = item.vi;
                 document.getElementById('cf').classList.remove('hidden'); document.getElementById('cb').classList.add('hidden');
-                document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+                document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
                 document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
             },
 
-            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4'); } },
+            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
 
             async ans(g) {
                 if(this.state.fsm !== 'BACK') return;
                 this.state.fsm = 'TRANSITION';
                 const qItem = this.state.queue.shift(); const item = qItem.ref || qItem;
                 const t = item.lastReview ? Math.max(0, Math.floor((Date.now() - item.lastReview) / 86400000)) : 0;
+                
                 if(!item.logs) item.logs = [];
                 item.logs.push({ g, t });
+                if (item.logs.length > 20) item.logs = item.logs.slice(-20);
 
                 this.calculate(item, g, t);
                 if(!qItem.isDebt) {
-                    DB.meta.totalRev = (DB.meta.totalRev || 0) + 1;
-                    if(g >= 2) DB.meta.successRev = (DB.meta.successRev || 0) + 1;
-                    DB.meta.sessionReviews = (DB.meta.sessionReviews || 0) + 1;
+                    DB.meta.totalRev++;
+                    if(g >= 2) DB.meta.successRev++;
+                    DB.meta.sessionReviews++;
                     this.updateStreak();
                 }
                 await DB.saveItem(item);
                 if(g === 1) this.state.queue.splice(Math.min(10, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 
-                // TỐI ƯU 2: Tự động chạy mỗi 50 câu (Im lặng)
-                if (DB.meta.sessionReviews >= 50) {
+                if (DB.meta.sessionReviews >= 30) {
                     DB.meta.sessionReviews = 0;
-                    this.optimizeW(true); 
+                    this.optimizeW(); 
                 }
-
                 await DB.saveMeta(); this.nextCard();
             },
 
             calculate(item, g, t) {
                 let { s, d, reps } = item; const w = DB.meta.W;
+                const ret = DB.meta.desired_retention;
                 const r = reps > 0 ? Math.exp(Math.log(0.9) * t / s) : 1;
                 if (reps === 0) {
                     s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
@@ -183,35 +194,33 @@
                     else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * ((g === 2) ? w[15] : (g === 4 ? w[16] : 1)));
                 }
                 s = Math.max(0.1, isFinite(s) ? s : 0.1); d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                const ivl = (g === 1) ? Math.min(s, 0.5) : s * (Math.pow(DB.meta.desired_retention, -1/0.9) - 1) * 9;
+                const ivl = (g === 1) ? Math.min(s, 0.5) : s * (Math.pow(ret, -1/0.9) - 1) * 9;
                 Object.assign(item, { s, d, reps: reps + 1, lastReview: Date.now(), next: Date.now() + (Math.max(0.005, ivl) * 86400000) });
             },
 
             updateStreak() {
                 const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
                 const last = DB.meta.lastDate ? new Date(DB.meta.lastDate).getTime() : 0;
-                const diff = (today - last) / 86400000;
-                if (diff === 1) { DB.meta.streak++; DB.meta.lastDate = now.toDateString(); } 
-                else if (diff > 1 || !DB.meta.lastDate) { DB.meta.streak = 1; DB.meta.lastDate = now.toDateString(); }
+                if ((today - last) / 86400000 === 1) { DB.meta.streak++; DB.meta.lastDate = now.toDateString(); } 
+                else if ((today - last) / 86400000 > 1 || !DB.meta.lastDate) { DB.meta.streak = 1; DB.meta.lastDate = now.toDateString(); }
             },
 
-            async optimizeW(silent = false) {
+            async optimizeW() {
                 if (this.state.isOptimizing) return;
                 const vocab = await DB.getVocab();
-                // TỐI ƯU 3: Ngưỡng an toàn 10 thẻ có log
-                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length > 0).map(v => ({ logs: v.logs }));
+                // Chỉ tối ưu khi có ít nhất 10 thẻ có lịch sử học (mỗi thẻ ít nhất 5 logs)
+                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 5).map(v => ({ logs: v.logs }));
                 if(cardsWithLogs.length < 10) return;
-
+                
                 this.state.isOptimizing = true;
-                const status = document.getElementById('sync-status');
+                const status = document.getElementById('sync-status'); 
                 if (status) status.classList.add('syncing');
 
                 const workerCode = `
                     self.onmessage = function(e) {
                         const { w, cardLogs, epochs } = e.data;
-                        let currentW = [...w];
+                        let curW = [...w];
                         const eps = 1e-4, alpha = 0.01;
-
                         function getLoss(testW) {
                             let logLoss = 0, count = 0;
                             cardLogs.forEach(card => {
@@ -224,77 +233,125 @@
                                         const p = Math.min(Math.max(r, 0.001), 0.999);
                                         logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
                                         count++;
-
                                         d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
                                         d = testW[4] * (1 - testW[7]) + d * testW[7];
-
-                                        if (g === 1) {
-                                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
-                                        } else {
-                                            const bonus = (g === 2) ? testW[15] : (g === 4 ? testW[16] : 1);
-                                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * bonus);
-                                        }
+                                        if (g === 1) s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
+                                        else s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * ((g === 2) ? testW[15] : (g === 4 ? testW[16] : 1)));
                                     } else {
-                                        s = testW[g - 1]; 
-                                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
+                                        s = testW[g - 1]; d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
                                     }
-                                    reps++; 
-                                    s = Math.max(0.1, s);
+                                    reps++; s = Math.max(0.1, s);
                                 });
                             });
                             return logLoss / (count || 1);
                         }
-
                         for (let e = 0; e < epochs; e++) {
                             let grads = new Array(19).fill(0);
-                            const baseLoss = getLoss(currentW);
+                            const baseLoss = getLoss(curW);
                             for (let j = 0; j < 19; j++) {
-                                let tempW = [...currentW]; 
-                                tempW[j] += eps;
+                                let tempW = [...curW]; tempW[j] += eps;
                                 grads[j] = (getLoss(tempW) - baseLoss) / eps;
                             }
                             for (let j = 0; j < 19; j++) {
-                                currentW[j] -= alpha * grads[j];
-                                currentW[j] = Math.max(0.001, parseFloat(currentW[j].toFixed(4)));
+                                curW[j] -= alpha * grads[j];
+                                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
                             }
                         }
-                        self.postMessage({ w: currentW });
+                        self.postMessage({ w: curW });
                     };
                 `;
+
+                const blob = new Blob([workerCode], {type: 'application/javascript'});
+                const blobURL = URL.createObjectURL(blob);
+                const worker = new Worker(blobURL);
                 
-                const worker = new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
+                // Thu hồi URL ngay để tránh rò rỉ bộ nhớ
+                URL.revokeObjectURL(blobURL);
+
                 worker.onmessage = async (e) => {
-                    DB.meta.W = e.data.w;
+                    DB.meta.W = e.data.w; 
                     await DB.saveMeta();
                     this.state.isOptimizing = false;
                     if (status) status.classList.remove('syncing');
-                    if (this.state.view === 'data') this.route('data');
                     worker.terminate();
                 };
-                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 50 });
+                
+                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 20 });
             },
 
-            // GIỮ NGUYÊN CÁC HÀM KHÁC ĐỂ KHÔNG LỖI LOGIC
             renderNexus(p) { p.innerHTML = `<div class="h-full flex flex-col gap-6"><div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner"><textarea id="in-batch" placeholder="word:meaning" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl resize-none placeholder:text-zinc-800"></textarea></div><button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm">Import</button></div>`; },
-            async batch() { const raw = document.getElementById('in-batch').value; if(!raw.trim()) return; const vocab = await DB.getVocab(); const existing = new Set(vocab.map(i => i.en.toLowerCase())); for(let l of raw.split('\n')) { const m = l.match(/^(.*?)(?::|-|=)(.*)$/); if(m && !existing.has(m[1].trim().toLowerCase())) await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [], againCount: 0, leech: false }); } document.getElementById('in-batch').value = ''; DB.updateUI(); this.route('study'); },
-            async renderVault(v) { const vocab = await DB.getVocab(); this.state.vaultData = vocab.reverse(); v.innerHTML = `<div class="flex flex-col h-full gap-4"><input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH..." class="p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase"><div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-3 pb-6"></div></div>`; this.renderVaultItems(); },
-            renderVaultItems() { const list = document.getElementById('vault-list'); if(!list) return; const q = (document.getElementById('vault-search')?.value || '').toLowerCase(); list.innerHTML = this.state.vaultData.filter(i => i.en.toLowerCase().includes(q) || i.vi.toLowerCase().includes(q)).slice(0, 50).map(item => `<div class="flex justify-between items-center p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem]"><div class="text-sm font-black uppercase truncate text-zinc-300">${item.en} <span class="text-teal-700">//</span> ${item.vi}</div><button onclick="Core.del('${item.id}')" class="text-[9px] font-black text-red-900/40 uppercase p-2">Del</button></div>`).join(''); },
-            filterVault() { this.renderVaultItems(); },
-            async del(id) { await DB.deleteItem(id); this.route('vault'); DB.updateUI(); },
-            async renderData(v) {
-                const vocab = await DB.getVocab(), todayStart = new Date().setHours(0,0,0,0);
-                const forecast = new Array(7).fill(0); vocab.forEach(item => { const d = Math.floor((item.next - todayStart) / 86400000); if (d >= 0 && d < 7) forecast[d]++; });
-                const maxVal = Math.max(...forecast, 1);
-                v.innerHTML = `<div class="grid grid-cols-2 gap-4 mb-6"><div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center"><div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Retention</div><div class="text-2xl font-black text-teal-500">${DB.meta.totalRev ? (DB.meta.successRev / DB.meta.totalRev * 100).toFixed(1) : 0}%</div></div><div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center"><div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Goal</div><div class="text-2xl font-black text-zinc-400">90%</div></div></div><div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6 h-40 flex items-end justify-between px-2">${forecast.map((count, i) => `<div class="flex flex-col items-center gap-2 w-full"><div class="forecast-bar w-4 bg-teal-500/20 rounded-t-lg border-t border-teal-500/50" style="height: ${(count/maxVal)*100}%"></div><span class="text-[8px] font-black text-zinc-500 uppercase">D+${i}</span></div>`).join('')}</div><div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 flex-grow flex flex-col"><textarea id="w-editor" class="w-full h-full bg-transparent text-teal-500 w-code-box outline-none resize-none custom-scroll">${JSON.stringify(DB.meta.W).replace(/,/g, ', ')}</textarea></div><div class="grid grid-cols-2 gap-4 pt-4"><button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button><button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button></div><input type="file" id="file" class="hidden" onchange="Core.imp(this)">`;
+            
+            async batch() { 
+                const raw = document.getElementById('in-batch').value; 
+                if(!raw.trim()) return; 
+                const vocab = await DB.getVocab();
+                const existing = new Set(vocab.map(i => i.en.toLowerCase()));
+                for(let l of raw.split('\n')) { 
+                    const m = l.match(/^(.*?)(?::|-|=)(.*)$/); 
+                    if(m && !existing.has(m[1].trim().toLowerCase())) {
+                        await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] }); 
+                    }
+                } 
+                await DB.flush(); 
+                this.route('study'); 
             },
-            async exp() { const v = await DB.getVocab(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'})); a.download = `STRIKER_V5.json`; a.click(); },
-            imp(el) { const r = new FileReader(); r.onload = async e => { const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta(); for(let i of d.v) await DB.saveItem(i); location.reload(); }; r.readAsText(el.files[0]); }
+
+            async renderVault(v) { 
+                this.state.vaultData = await DB.getVocab();
+                v.innerHTML = `<div class="flex flex-col h-full gap-4"><input id="vault-search" oninput="Core.filterVault()" placeholder="SEARCH..." class="p-6 bg-zinc-900 border border-zinc-800 text-teal-500 rounded-3xl outline-none font-black text-xs uppercase"><div id="vault-list" class="flex-grow overflow-y-auto custom-scroll flex flex-col gap-3 pb-6"></div></div>`; 
+                this.filterVault();
+            },
+
+            filterVault() {
+                const list = document.getElementById('vault-list'); if(!list) return;
+                const q = (document.getElementById('vault-search')?.value || '').toLowerCase();
+                list.innerHTML = this.state.vaultData.filter(i => i.en.toLowerCase().includes(q) || i.vi.toLowerCase().includes(q)).reverse().slice(0,50).map(item => `
+                    <div class="flex justify-between items-center p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem]">
+                        <div class="text-sm font-black uppercase truncate text-zinc-300">${item.en} <span class="text-teal-900">//</span> ${item.vi}</div>
+                        <button onclick="Core.del('${item.id}')" class="text-[9px] font-black text-red-900/40 uppercase p-2">Del</button>
+                    </div>`).join('');
+            },
+
+            async del(id) { await DB.deleteItem(id); await DB.flush(); this.route('vault'); DB.updateUI(); },
+
+            async renderData(v) {
+                v.innerHTML = `
+                    <div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-[10px] font-black uppercase text-zinc-500">Desired Retention</span>
+                            <span id="ret-val" class="text-xl font-black text-teal-500">${(DB.meta.desired_retention * 100).toFixed(0)}%</span>
+                        </div>
+                        <input type="range" min="0.7" max="0.97" step="0.01" value="${DB.meta.desired_retention}" 
+                            oninput="Core.updateRetention(this.value)" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
+                            <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Actual Retention</div>
+                            <div class="text-2xl font-black text-teal-500">${DB.meta.totalRev ? (DB.meta.successRev / DB.meta.totalRev * 100).toFixed(1) : 0}%</div>
+                        </div>
+                        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
+                            <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Total Reviews</div>
+                            <div class="text-2xl font-black text-zinc-400">${DB.meta.totalRev}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button>
+                        <button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button>
+                    </div><input type="file" id="file" class="hidden" onchange="Core.imp(this)">
+                `;
+            },
+            updateRetention(v) {
+                DB.meta.desired_retention = parseFloat(v);
+                document.getElementById('ret-val').innerText = (v * 100).toFixed(0) + '%';
+                DB.saveMeta();
+            },
+            async exp() { const v = await DB.getVocab(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'})); a.download = `STRIKER_DATA.json`; a.click(); },
+            imp(el) { const r = new FileReader(); r.onload = async e => { const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta(); for(let i of d.v) await DB.saveItem(i); await DB.flush(); location.reload(); }; r.readAsText(el.files[0]); }
         };
 
         window.onkeydown = e => {
-            const foc = document.activeElement.id; if(['w-editor', 'in-batch', 'vault-search'].includes(foc)) return;
             const k = e.key.toLowerCase();
-            if(['a','s','d','f'].includes(k)) { e.preventDefault(); Core.route(k==='a'?'study':k==='s'?'nexus':k==='d'?'vault':'data'); }
+            const foc = document.activeElement.tagName; if(foc === 'TEXTAREA' || foc === 'INPUT') return;
             if(Core.state.view === 'study' && Core.state.queue.length) {
                 if(e.code === 'Space') { e.preventDefault(); Core.flip(); }
                 if(Core.state.fsm === 'BACK' && ['1','2','3','4'].includes(k)) Core.ans(parseInt(k));
