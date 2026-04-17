@@ -35,12 +35,13 @@
 
         <main id="view" class="custom-scroll"></main>
 
-        <nav class="grid grid-cols-4 gap-3 shrink-0 pb-2">
-            <button onclick="Core.route('study')" id="n-study" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Study</button>
-            <button onclick="Core.route('nexus')" id="n-nexus" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Nexus</button>
-            <button onclick="Core.route('vault')" id="n-vault" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Vault</button>
-            <button onclick="Core.route('data')" id="n-data" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-[10px] uppercase tracking-widest border border-zinc-800">Data</button>
-        </nav>
+        <nav class="grid grid-cols-5 gap-2 shrink-0 pb-2">
+    <button onclick="Core.route('study')" id="n-study" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Study</button>
+    <button onclick="Core.route('nexus')" id="n-nexus" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Nexus</button>
+    <button onclick="Core.route('forecast')" id="n-forecast" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-[10px] uppercase tracking-widest border border-zinc-800">Forecast</button>
+    <button onclick="Core.route('vault')" id="n-vault" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-xs uppercase tracking-widest border border-zinc-800">Vault</button>
+    <button onclick="Core.route('data')" id="n-data" class="bg-zinc-900 py-5 rounded-3xl font-black text-zinc-500 text-[10px] uppercase tracking-widest border border-zinc-800">Data</button>
+</nav>
     </div>
 
     <script>
@@ -130,6 +131,7 @@ const DEFAULT_W = [
                     this.state.initialQueueSize = this.state.queue.length;
                     this.renderStudyFrame(port); this.nextCard();
                 } else if(v === 'nexus') this.renderNexus(port);
+                    else if(v === 'forecast') { this.state.vaultData = await DB.getVocab(); this.renderForecast(port); }
                 else if(v === 'vault') this.renderVault(port);
                 else if(v === 'data') this.renderData(port);
             },
@@ -412,7 +414,30 @@ const DEFAULT_W = [
                 DB.saveMeta();
             },
             async exp() { const v = await DB.getVocab(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({v, m:DB.meta})], {type:'application/json'})); a.download = `STRIKER_DATA.json`; a.click(); },
-            imp(el) { const r = new FileReader(); r.onload = async e => { const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta(); for(let i of d.v) await DB.saveItem(i); await DB.flush(); location.reload(); }; r.readAsText(el.files[0]); }
+            imp(el) { const r = new FileReader(); r.onload = async e => { const d = JSON.parse(e.target.result); DB.meta = d.m; await DB.saveMeta(); for(let i of d.v) await DB.saveItem(i); await DB.flush(); location.reload(); }; r.readAsText(el.files[0]); },getForecastData(days) {
+                const vocab = this.state.vaultData || [];
+                const targetR = DB.meta.desired_retention;
+                const now = Date.now();
+                let totalR = 0, learned = 0, dailyDue = Array(parseInt(days) || 7).fill(0);
+                vocab.forEach(item => {
+                    if (!item.s || item.reps === 0) return;
+                    learned++;
+                    const tEnd = (now + (days * 86400000) - (item.lastReview || now)) / 86400000;
+                    totalR += Math.pow(1 + tEnd / (9 * item.s), -1);
+                    const tDue = 9 * item.s * (1 / targetR - 1);
+                    const diff = Math.floor(((item.lastReview || now) + (tDue * 86400000) - now) / 86400000);
+                    if (diff >= 0 && diff < days) dailyDue[diff]++;
+                    else if (diff < 0) dailyDue[0]++;
+                });
+                return { avgR: learned ? (totalR / learned * 100).toFixed(1) : 100, dailyDue };
+            },
+
+            renderForecast(p) {
+                const d = parseInt(localStorage.getItem('fc_days') || '15');
+                const data = this.getForecastData(d);
+                const max = Math.max(...data.dailyDue, 1);
+                p.innerHTML = `<div class="flex flex-col gap-5"><div class="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 text-center"><p class="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-2">Trí nhớ sau ${d} ngày</p><h2 class="text-6xl font-black text-teal-500">${data.avgR}%</h2></div><div class="bg-zinc-900 p-4 rounded-3xl border border-zinc-800 flex gap-3"><input id="days-in" type="number" value="${d}" class="w-16 bg-black border border-zinc-800 text-teal-500 font-black text-center rounded-xl outline-none"><button onclick="localStorage.setItem('fc_days', document.getElementById('days-in').value); Core.route('forecast')" class="ml-auto bg-teal-500 text-black px-6 py-2 rounded-xl font-black text-[10px] uppercase">Dự báo</button></div><div class="bg-zinc-900/30 border border-zinc-800/50 rounded-[2.5rem] p-6"><p class="text-[10px] font-black uppercase text-zinc-500 mb-4 text-center tracking-widest">Thẻ đến hạn</p><div class="flex items-end gap-1 h-32">${data.dailyDue.map(c => `<div class="bg-teal-500/20 border-t-2 border-teal-500 w-full" style="height:${(c/max*100)+2}%"></div>`).join('')}</div><div class="flex justify-between mt-3 text-[9px] font-black text-zinc-700 uppercase"><span>Hôm nay</span><span>Ngày ${d}</span></div></div></div>`;
+            }
         };
 
         window.onkeydown = e => {
