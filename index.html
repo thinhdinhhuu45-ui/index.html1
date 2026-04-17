@@ -44,7 +44,16 @@
     </div>
 
     <script>
-        const DEFAULT_W = [0.4, 0.9, 2.5, 14.2, 4.9, 1.0, 0.9, 0.01, 1.6, 0.1, 1.0, 2.2, 0.08, 0.3, 2.1, 0.2, 2.1, 0.5, 0.9];
+        // Chỗ thay số 1: Nâng cấp danh sách tham số lên 21 (FSRS v5)
+const DEFAULT_W = [
+    0.4025, 1.1838, 3.173, 15.691,  // W0-W3: Độ ổn định ban đầu
+    7.1949, 0.5345,                  // W4-W5: Độ khó ban đầu
+    1.4604, 0.0046,                  // W6-W7: Độ khó "trôi dạt" (Drift)
+    1.5457, 0.1192, 1.0192,          // W8-W10: Tăng trưởng độ ổn định
+    1.9395, 0.11, 0.296, 2.2698,     // W11-W14: Khi bạn quên bài (Again)
+    0.2315, 2.9898,                  // W15-W16: Thưởng/Phạt (Hard/Easy)
+    0.5165, 0.6621, 0.338, 0.06      // W17-W20: [MỚI] Tối ưu ngắn hạn & phục hồi
+];
         
         const DB = {
             idb: null,
@@ -182,20 +191,45 @@
             },
 
             calculate(item, g, t) {
-                let { s, d, reps } = item; const w = DB.meta.W;
+                let { s, d, reps } = item; 
+                const w = DB.meta.W;
                 const ret = DB.meta.desired_retention;
+                
+                // Tính khả năng nhớ lại (Retrievability)
                 const r = reps > 0 ? Math.pow(1 + t / (9 * s), -1) : 1;
+
                 if (reps === 0) {
-                    s = w[g - 1]; d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
+                    // Khởi tạo thẻ mới (W0-W3 cho Stability, W4-W5 cho Difficulty)
+                    s = w[g - 1]; 
+                    d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
+                    // Cập nhật Difficulty (D) với cơ chế Drift (W6, W7)
                     d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
                     d = w[4] * (1 - w[7]) + d * w[7]; 
-                    if (g === 1) s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
-                    else s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * ((g === 2) ? w[15] : (g === 4 ? w[16] : 1)));
+                    
+                    if (g === 1) {
+                        // Khi quên bài (Again) - Dùng W11 đến W14
+                        s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
+                    } else {
+                        // Khi nhớ bài (Hard, Good, Easy) - Dùng W8 đến W10 + W15, W16
+                        const h = (g === 2) ? w[15] : 1;
+                        const e = (g === 4) ? w[16] : 1;
+                        s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * h * e);
+                    }
                 }
-                s = Math.max(0.1, isFinite(s) ? s : 0.1); d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                const ivl = (g === 1) ? Math.min(s, 0.5) : s * 9 * (1 / ret - 1);
-                Object.assign(item, { s, d, reps: reps + 1, lastReview: Date.now(), next: Date.now() + (Math.max(0.005, ivl) * 86400000) });
+
+                s = Math.max(0.1, isFinite(s) ? s : 0.1); 
+                d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
+                
+                // Khoảng cách ngày (Interval) chuẩn FSRS v5
+                const ivl = s * 9 * (1 / ret - 1);
+
+                Object.assign(item, { 
+                    s, d, 
+                    reps: reps + 1, 
+                    lastReview: Date.now(), 
+                    next: Date.now() + (Math.max(0.01, ivl) * 86400000) 
+                });
             },
 
             updateStreak() {
@@ -217,52 +251,70 @@
                 if (status) status.classList.add('syncing');
 
                 const workerCode = `
-                    self.onmessage = function(e) {
-                        const { w, cardLogs, epochs } = e.data;
-                        let curW = [...w];
-let m = new Array(19).fill(0); // <-- Thêm dòng này
-const eps = 1e-4, alpha = 0.01, beta = 0.9; // <-- Thêm beta = 0.9 vào cuối
-                        function getLoss(testW) {
-                            let logLoss = 0, count = 0;
-                            cardLogs.forEach(card => {
-                                let s = 0, d = 0, reps = 0;
-                                card.logs.forEach(log => {
-                                    const { g, t } = log;
-if (t < 0.02 && reps > 0) return; // Chèn thêm dòng này vào giữa
-const y = g === 1 ? 0 : 1;
-                                    if (reps > 0) {
-                                        const r = Math.pow(1 + t / (9 * s), -1);
-                                        const p = Math.min(Math.max(r, 0.001), 0.999);
-                                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
-                                        count++;
-                                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
-                                        d = testW[4] * (1 - testW[7]) + d * testW[7];
-                                        if (g === 1) s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
-                                        else s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * ((g === 2) ? testW[15] : (g === 4 ? testW[16] : 1)));
-                                    } else {
-                                        s = testW[g - 1]; d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
-                                    }
-                                    reps++; s = Math.max(0.1, s);
-                                });
-                            });
-                            return logLoss / (count || 1);
+    self.onmessage = function(e) {
+        const { w, cardLogs, epochs } = e.data;
+        let curW = [...w];
+        let m = new Array(21).fill(0); 
+        const eps = 1e-4, alpha = 0.01, beta = 0.9;
+        
+        function getLoss(testW) {
+            let logLoss = 0, count = 0;
+            cardLogs.forEach(card => {
+                let s = 0, d = 0, reps = 0;
+                card.logs.forEach(log => {
+                    const { g, t } = log;
+                    // Bỏ qua review trong vòng 1-2 phút (nhồi kiến thức ngắn hạn)
+                    if (t < 0.02 && reps > 0) return; 
+                    
+                    const y = g === 1 ? 0 : 1; 
+                    if (reps > 0) {
+                        const r = Math.pow(1 + t / (9 * s), -1);
+                        const p = Math.min(Math.max(r, 0.001), 0.999);
+                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
+                        
+                        // Logic D và S khớp 100% với hàm calculate (V5 chuẩn)
+                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
+                        d = testW[4] * (1 - testW[7]) + d * testW[7];
+
+                        if (g === 1) {
+                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
+                        } else {
+                            const h = (g === 2) ? testW[15] : 1;
+                            const e = (g === 4) ? testW[16] : 1;
+                            // ĐÃ FIX: Dùng s thay vì testW[9] ở cơ số
+                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * h * e);
                         }
-                        for (let e = 0; e < epochs; e++) {
-                            let grads = new Array(19).fill(0);
-                            const baseLoss = getLoss(curW);
-                            for (let j = 0; j < 19; j++) {
-                                let tempW = [...curW]; tempW[j] += eps;
-                                grads[j] = (getLoss(tempW) - baseLoss) / eps;
-                            }
-                            for (let j = 0; j < 19; j++) {
-                                m[j] = beta * m[j] + (1 - beta) * grads[j]; // <-- Dòng mới 1
-curW[j] -= alpha * m[j]; // <-- Dòng mới 2
-                                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
-                            }
-                        }
-                        self.postMessage({ w: curW });
-                    };
-                `;
+                    } else {
+                        s = testW[g - 1]; 
+                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
+                    }
+                    reps++; 
+                    s = Math.max(0.1, s);
+                    count++;
+                });
+            });
+            return logLoss / (count || 1);
+        }
+
+        for (let e = 0; e < epochs; e++) {
+            let grads = new Array(21).fill(0);
+            const baseLoss = getLoss(curW);
+            for (let j = 0; j < 21; j++) {
+                let tempW = [...curW]; 
+                tempW[j] += eps;
+                grads[j] = (getLoss(tempW) - baseLoss) / eps;
+            }
+            for (let j = 0; j < 21; j++) {
+                // Thuật toán tối ưu hóa Momentum
+                m[j] = beta * m[j] + (1 - beta) * grads[j];
+                curW[j] -= alpha * m[j];
+                // Chốt chặn giá trị tham số không bị âm
+                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
+            }
+        }
+        self.postMessage({ w: curW });
+    };
+`;
 
                 const blob = new Blob([workerCode], {type: 'application/javascript'});
                 const blobURL = URL.createObjectURL(blob);
