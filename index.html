@@ -227,7 +227,8 @@
                                 let s = 0, d = 0, reps = 0;
                                 card.logs.forEach(log => {
                                     const { g, t } = log;
-                                    const y = g === 1 ? 0 : 1;
+if (t < 0.02 && reps > 0) return; // Chèn thêm dòng này vào giữa
+const y = g === 1 ? 0 : 1;
                                     if (reps > 0) {
                                         const r = Math.pow(1 + t / (9 * s), -1);
                                         const p = Math.min(Math.max(r, 0.001), 0.999);
