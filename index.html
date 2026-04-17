@@ -327,6 +327,17 @@ curW[j] -= alpha * m[j]; // <-- Dòng mới 2
                         <input type="range" min="0.7" max="0.97" step="0.01" value="${DB.meta.desired_retention}" 
                             oninput="Core.updateRetention(this.value)" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
                     </div>
+                    <div class="bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem] p-6 mb-6">
+    <div class="text-[10px] font-black uppercase text-zinc-500 mb-4 text-center tracking-widest">AI Brain Weights (W0-W18)</div>
+    <div class="grid grid-cols-4 gap-2">
+        ${DB.meta.W.map((val, i) => `
+            <div class="bg-black/40 p-2 rounded-xl border border-zinc-800/30 text-center">
+                <div class="text-[7px] text-zinc-600 font-bold">W${i}</div>
+                <div class="text-[10px] font-mono font-black text-teal-600">${val.toFixed(3)}</div>
+            </div>
+        `).join('')}
+    </div>
+</div>
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
                             <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Actual Retention</div>
