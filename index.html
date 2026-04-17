@@ -344,9 +344,9 @@ const DEFAULT_W = [
                 const vocab = await DB.getVocab();
                 const existing = new Set(vocab.map(i => i.en.toLowerCase()));
                 for(let l of raw.split('\n')) { 
-                    const m = l.match(/^(.*?)(?::|-|=)(.*)$/); 
-                    if(m && !existing.has(m[1].trim().toLowerCase())) {
-                        await DB.saveItem({ id: crypto.randomUUID(), en: m[1].trim(), vi: m[2].trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] }); 
+                    const parts = l.split(':');
+                    if(parts.length > 1 && !existing.has(parts[0].trim().toLowerCase())) {
+                        await DB.saveItem({ id: crypto.randomUUID(), en: parts[0].trim(), vi: parts.slice(1).join(':').trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] }); 
                     }
                 } 
                 await DB.flush(); 
