@@ -220,7 +220,8 @@
                     self.onmessage = function(e) {
                         const { w, cardLogs, epochs } = e.data;
                         let curW = [...w];
-                        const eps = 1e-4, alpha = 0.01;
+let m = new Array(19).fill(0); // <-- Thêm dòng này
+const eps = 1e-4, alpha = 0.01, beta = 0.9; // <-- Thêm beta = 0.9 vào cuối
                         function getLoss(testW) {
                             let logLoss = 0, count = 0;
                             cardLogs.forEach(card => {
@@ -254,7 +255,8 @@ const y = g === 1 ? 0 : 1;
                                 grads[j] = (getLoss(tempW) - baseLoss) / eps;
                             }
                             for (let j = 0; j < 19; j++) {
-                                curW[j] -= alpha * grads[j];
+                                m[j] = beta * m[j] + (1 - beta) * grads[j]; // <-- Dòng mới 1
+curW[j] -= alpha * m[j]; // <-- Dòng mới 2
                                 curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
                             }
                         }
