@@ -294,7 +294,8 @@ async function askAI(prompt) {
         }
     }
 
-    s = Math.max(0.1, isFinite(s) ? s : 0.1);
+    // Chốt chặn NaN, Infinity và giới hạn s không vượt quá 100 năm (36500 ngày) để chống tràn bộ nhớ
+s = (isFinite(s) && !isNaN(s)) ? Math.min(Math.max(s, 0.1), 36500) : 0.1;
     const ivl = s * 9 * (1 / ret - 1); // Khoảng cách ngày học tiếp theo
 
     Object.assign(item, {
@@ -314,9 +315,13 @@ async function askAI(prompt) {
             async optimizeW() {
     if (this.state.isOptimizing) return;
     const vocab = await DB.getVocab();
-    // Cần tối thiểu 10-20 thẻ có lịch sử học để bắt đầu "khôn"
     const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 3);
-    if(cardsWithLogs.length < 10) return;
+    
+    // Thêm thông báo ở đây
+    if(cardsWithLogs.length < 10) {
+        alert("Cần tối thiểu 10 thẻ có lịch sử học (3 lần review/thẻ) để AI có đủ dữ liệu rèn luyện!");
+        return;
+    }
 
     this.state.isOptimizing = true;
     const status = document.getElementById('sync-status');
@@ -406,22 +411,24 @@ async function askAI(prompt) {
                     lastReview: 0, logs: [] 
                 }); 
             }
-        } else {
-            // NẾU LÀ NHẬP TAY KIỂU CŨ (word:meaning)
-            const lines = raw.split('\n').map(l => l.trim()).filter(l => l.includes(':'));
-            for(let l of lines) { 
-                const parts = l.split(':');
-                const en = parts[0].trim();
-                const vi = parts.slice(1).join(':').trim();
-                if(en && vi) {
-                    await DB.saveItem({ 
-                        id: generateID(), en, vi, 
-                        next: Date.now(), reps: 0, s: 0, d: 5, 
-                        lastReview: 0, logs: [] 
-                    }); 
-                }
-            } 
+        } // Tìm trong hàm batch(), phần else của việc nạp thẻ thủ công
+else {
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.includes(':'));
+    for(let l of lines) { 
+        const parts = l.split(':');
+        const en = parts[0].trim();
+        const vi = parts.slice(1).join(':').trim();
+        if(en && vi) {
+            await DB.saveItem({ 
+                id: generateID(), en, vi, 
+                next: Date.now(), reps: 0, 
+                s: 0.4, // Thay 0 bằng 0.4 để đồng nhất với định dạng AI
+                d: 5, 
+                lastReview: 0, logs: [] 
+            }); 
         }
+    } 
+}
         await DB.flush(); 
         inputEl.value = '';
         await DB.flush(); 
@@ -489,6 +496,7 @@ async function askAI(prompt) {
                             <div class="text-2xl font-black text-zinc-400">${DB.meta.totalRev}</div>
                         </div>
                     </div>
+                    <button onclick="Core.optimizeW()" class="w-full mb-4 py-5 bg-teal-900/20 border border-teal-800 rounded-[2rem] font-black text-xs uppercase text-teal-500 active:bg-teal-500 active:text-black transition-all tracking-widest">Force Train AI</button>
                     <div class="grid grid-cols-2 gap-4">
                         <button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button>
                         <button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button>
