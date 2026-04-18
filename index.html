@@ -302,7 +302,7 @@ async function askAI(prompt) {
         lastReview: Date.now(),
         next: Date.now() + (Math.max(0.01, ivl) * 86400000)
     });
-}
+},
 
             updateStreak() {
                 const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
