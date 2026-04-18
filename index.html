@@ -167,21 +167,43 @@ async function askAI(prompt) {
             state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', isOptimizing: false, vaultData: [] },
             
             async route(v) {
-                await DB.flush();
-                this.state.view = v;
-                document.querySelectorAll('nav button').forEach(b => b.classList.toggle('tab-active', b.id === 'n-'+v));
-                const port = document.getElementById('view'); port.innerHTML = '';
-                
-                if(v === 'study') {
-                    const v_list = await DB.getVocab();
-                    this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a,b) => a.next - b.next);
-                    this.state.initialQueueSize = this.state.queue.length;
-                    this.renderStudyFrame(port); this.nextCard();
-                } else if(v === 'nexus') this.renderNexus(port);
-                    else if(v === 'forecast') { this.state.vaultData = await DB.getVocab(); this.renderForecast(port); }
-                else if(v === 'vault') this.renderVault(port);
-                else if(v === 'data') this.renderData(port);
-            },
+    console.log("Đang chuyển sang tab:", v); // Dòng này để kiểm tra lỗi
+    try {
+        await DB.flush();
+        this.state.view = v;
+
+        // Cập nhật giao diện nút bấm
+        document.querySelectorAll('nav button').forEach(b => {
+            b.classList.toggle('tab-active', b.id === 'n-' + v);
+        });
+
+        const port = document.getElementById('view'); 
+        if (!port) return; 
+        port.innerHTML = ''; // Xóa màn hình cũ
+        
+        // Logic hiển thị từng màn hình
+        if (v === 'study') {
+            const v_list = await DB.getVocab();
+            this.state.queue = v_list.filter(i => i.next <= Date.now()).sort((a, b) => a.next - b.next);
+            this.state.initialQueueSize = this.state.queue.length;
+            this.renderStudyFrame(port); 
+            this.nextCard();
+        } else if (v === 'nexus') {
+            this.renderNexus(port);
+        } else if (v === 'forecast') {
+            const v_list = await DB.getVocab();
+            this.state.vaultData = v_list;
+            this.renderForecast(port);
+        } else if (v === 'vault') {
+            this.renderVault(port);
+        } else if (v === 'data') {
+            this.renderData(port);
+        }
+    } catch (e) {
+        console.error("LỖI ĐIỀU HƯỚNG:", e);
+        alert("App bị lỗi logic, nhấn F12 để xem chi tiết");
+    }
+},
 
             renderStudyFrame(v) {
                 v.innerHTML = `<div id="study-container" class="h-full flex flex-col justify-between">
