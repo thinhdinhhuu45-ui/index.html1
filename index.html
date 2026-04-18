@@ -142,7 +142,27 @@ const DB = {
 };
 
         window.addEventListener('beforeunload', () => DB.flush());
+// ==========================================
+// BƯỚC 1: KẾT NỐI BỘ NÃO GEMINI AI
+// ==========================================
+const GEMINI_API_KEY = "AIzaSyB0OallSzi7gzI6p4viM-U5MPiUwgN_Z0Y";
 
+async function askAI(prompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+    } catch (e) {
+        console.error("Lỗi AI:", e);
+        return null;
+    }
+}
+// ==========================================
         const Core = {
             state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', isOptimizing: false, vaultData: [] },
             
@@ -339,46 +359,58 @@ const DB = {
             renderNexus(p) { p.innerHTML = `<div class="h-full flex flex-col gap-6"><div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner"><textarea id="in-batch" placeholder="word:meaning" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl resize-none placeholder:text-zinc-800"></textarea></div><button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm">Import</button></div>`; },
             
             async batch() { 
-                const inputEl = document.getElementById('in-batch');
-                const raw = inputEl.value; 
-                if(!raw.trim()) return; 
-                
-                // Đổi trạng thái nút để tránh bấm nhầm khi đang xử lý
-                const btn = event.target;
-                const originalText = btn.innerText;
-                btn.innerText = "IMPORTING...";
-                btn.disabled = true;
+    const inputEl = document.getElementById('in-batch');
+    const raw = inputEl.value.trim(); 
+    if(!raw) return; 
 
-                const vocab = await DB.getVocab();
-                const existing = new Set(vocab.map(i => i.en.toLowerCase()));
-                
-                // Quét rác: Chỉ lấy những dòng có định dạng "từ:nghĩa", bỏ dòng trống
-                const lines = raw.split('\n').map(l => l.trim()).filter(l => l.includes(':'));
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "AI ĐANG NẠP THẺ...";
+    btn.disabled = true;
 
-                for(let l of lines) { 
-                    const parts = l.split(':');
-                    const en = parts[0].trim();
-                    const vi = parts.slice(1).join(':').trim(); // Lấy hết phần nghĩa kể cả khi có dấu :
-                    
-                    if(en && vi && !existing.has(en.toLowerCase())) {
-                        await DB.saveItem({ 
-                            id: generateID(), 
-                            en, vi, 
-                            next: Date.now(), 
-                            reps: 0, s: 0, d: 0, 
-                            lastReview: 0, logs: [] 
-                        }); 
-                        existing.add(en.toLowerCase()); 
-                    }
-                } 
-                
-                await DB.flush(); 
-                inputEl.value = ''; // Dọn sạch ô nhập
-                btn.innerText = originalText;
-                btn.disabled = false;
-                this.route('study'); 
-                DB.updateUI();
-            },
+    try {
+        // KIỂM TRA NẾU LÀ DỮ LIỆU JSON TỪ AI
+        if (raw.startsWith('[') || raw.startsWith('{')) {
+            const data = JSON.parse(raw);
+            const list = Array.isArray(data) ? data : [data];
+            for (let item of list) {
+                await DB.saveItem({ 
+                    id: generateID(), 
+                    en: item.en, vi: item.vi, 
+                    next: Date.now(), 
+                    reps: 0, 
+                    s: 0.4, 
+                    d: item.d || 5, // AI gán độ khó d ở đây
+                    lastReview: 0, logs: [] 
+                }); 
+            }
+        } else {
+            // NẾU LÀ NHẬP TAY KIỂU CŨ (word:meaning)
+            const lines = raw.split('\n').map(l => l.trim()).filter(l => l.includes(':'));
+            for(let l of lines) { 
+                const parts = l.split(':');
+                const en = parts[0].trim();
+                const vi = parts.slice(1).join(':').trim();
+                if(en && vi) {
+                    await DB.saveItem({ 
+                        id: generateID(), en, vi, 
+                        next: Date.now(), reps: 0, s: 0, d: 5, 
+                        lastReview: 0, logs: [] 
+                    }); 
+                }
+            } 
+        }
+        await DB.flush(); 
+        inputEl.value = '';
+        this.route('study'); 
+        DB.updateUI();
+    } catch(e) {
+        alert("Lỗi: Dữ liệu AI không đúng định dạng!");
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+},
 
             async renderVault(v) { 
                 this.state.vaultData = await DB.getVocab();
