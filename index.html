@@ -56,63 +56,90 @@ const DEFAULT_W = [
     0.5165, 0.6621, 0.338, 0.06      // W17-W20: [MỚI] Tối ưu ngắn hạn & phục hồi
 ];
         
-        const DB = {
-            idb: null,
-            meta: { streak: 0, lastDate: null, desired_retention: 0.9, W: [...DEFAULT_W], totalRev: 0, successRev: 0, sessionReviews: 0 },
-            writeBuffer: new Map(),
-            
-            async init() {
-                return new Promise(res => {
-                    const req = indexedDB.open("KP_STRIKER_V5_CORE", 1);
-                    req.onupgradeneeded = e => {
-                        const db = e.target.result;
-                        db.createObjectStore("vocab", { keyPath: "id" });
-                        db.createObjectStore("meta");
-                    };
-                    req.onsuccess = async e => {
-                        this.idb = e.target.result;
-                        const saved = await this.getMeta();
-                        if (saved) this.meta = { ...this.meta, ...saved };
-                        res();
-                    };
-                });
-            },
-            
-            async flush() {
-                if (this.writeBuffer.size === 0) return;
-                return new Promise((res) => {
-                    const tx = this.idb.transaction("vocab", "readwrite");
-                    const store = tx.objectStore("vocab");
-                    for (let item of this.writeBuffer.values()) store.put(item);
-                    this.writeBuffer.clear();
-                    tx.oncomplete = () => res();
-                });
-            },
+        const generateID = () => {
+    try { return crypto.randomUUID(); } 
+    catch(e) { return Date.now().toString(36) + Math.random().toString(36).substring(2); }
+};
 
-            async getVocab() { 
-                await this.flush(); 
-                return new Promise(r => this.idb.transaction("vocab").objectStore("vocab").getAll().onsuccess = e => r(e.target.result || []));
-            },
+const DB = {
+    idb: null,
+    meta: { streak: 0, lastDate: null, desired_retention: 0.9, W: [...DEFAULT_W], totalRev: 0, successRev: 0, sessionReviews: 0 },
+    writeBuffer: new Map(),
+    
+    async init() {
+        return new Promise(res => {
+            const req = indexedDB.open("KP_STRIKER_V5_CORE", 1);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains("vocab")) db.createObjectStore("vocab", { keyPath: "id" });
+                if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+            };
+            req.onsuccess = async e => {
+                this.idb = e.target.result;
+                const saved = await this.getMeta();
+                if (saved) this.meta = { ...this.meta, ...saved };
+                res();
+            };
+        });
+    },
 
-            async saveItem(item) { 
-                this.writeBuffer.set(item.id, item); 
-                if (this.writeBuffer.size >= 1) await this.flush(); 
-            },
+    async flush() {
+        if (this.writeBuffer.size === 0) return;
+        return new Promise((res) => {
+            const tx = this.idb.transaction("vocab", "readwrite");
+            const store = tx.objectStore("vocab");
+            for (let item of this.writeBuffer.values()) store.put(item);
+            this.writeBuffer.clear();
+            tx.oncomplete = () => res();
+        });
+    },
 
-            async saveMeta() { 
-                this.idb.transaction("meta", "readwrite").objectStore("meta").put(this.meta, "main");
-                this.updateUI();
-            },
+    async getVocab() { 
+        await this.flush(); 
+        return new Promise(r => {
+            const tx = this.idb.transaction("vocab", "readonly");
+            tx.objectStore("vocab").getAll().onsuccess = e => r(e.target.result || []);
+        });
+    },
 
-            async getMeta() { return new Promise(r => this.idb.transaction("meta").objectStore("meta").get("main").onsuccess = e => r(e.target.result)); },
-            async deleteItem(id) { this.writeBuffer.delete(id); this.idb.transaction("vocab", "readwrite").objectStore("vocab").delete(id); },
-            updateUI() {
-                document.getElementById('streak').innerText = this.meta.streak;
-                this.getVocab().then(v => {
-                    document.getElementById('target-count').innerText = v.filter(i => i.next <= Date.now()).length;
-                });
-            }
-        };
+    async saveItem(item) { 
+        // CHỐT CHẶN: Ép dữ liệu về số thực, tránh lỗi NaN gây hỏng database
+        item.s = Math.max(0.1, isFinite(item.s) ? item.s : 0.1);
+        item.d = Math.min(Math.max(isFinite(item.d) ? item.d : 5, 1), 10);
+        item.next = isFinite(item.next) ? item.next : Date.now();
+        
+        this.writeBuffer.set(item.id, item); 
+        if (this.writeBuffer.size >= 1) await this.flush(); 
+    },
+
+    async saveMeta() { 
+        const tx = this.idb.transaction("meta", "readwrite");
+        tx.objectStore("meta").put(this.meta, "main");
+        this.updateUI();
+    },
+
+    async getMeta() { 
+        return new Promise(r => {
+            const tx = this.idb.transaction("meta", "readonly");
+            tx.objectStore("meta").get("main").onsuccess = e => r(e.target.result);
+        });
+    },
+
+    async deleteItem(id) { 
+        this.writeBuffer.delete(id); 
+        const tx = this.idb.transaction("vocab", "readwrite");
+        tx.objectStore("vocab").delete(id); 
+    },
+
+    updateUI() {
+        const streakEl = document.getElementById('streak');
+        const targetEl = document.getElementById('target-count');
+        if (streakEl) streakEl.innerText = this.meta.streak;
+        this.getVocab().then(v => {
+            if (targetEl) targetEl.innerText = v.filter(i => i.next <= Date.now()).length;
+        });
+    }
+};
 
         window.addEventListener('beforeunload', () => DB.flush());
 
@@ -236,6 +263,7 @@ const DEFAULT_W = [
             async optimizeW() {
                 if (this.state.isOptimizing) return;
                 const vocab = await DB.getVocab();
+                // Chỉ tối ưu khi có ít nhất 5 từ đã học trên 3 lần để đủ dữ liệu
                 const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 3).map(v => ({ logs: v.logs }));
                 if(cardsWithLogs.length < 5) return;
                 
@@ -244,104 +272,124 @@ const DEFAULT_W = [
                 if (status) status.classList.add('syncing');
 
                 const workerCode = `
-    self.onmessage = function(e) {
-        const { w, cardLogs, epochs } = e.data;
-        let curW = [...w];
-        let m = new Array(21).fill(0); 
-        const eps = 1e-4, alpha = 0.01, beta = 0.9;
-        
-        function getLoss(testW) {
-            let logLoss = 0, count = 0;
-            cardLogs.forEach(card => {
-                let s = 0, d = 0, reps = 0;
-                card.logs.forEach(log => {
-                    const { g, t } = log;
-                    // Bỏ qua review trong vòng 1-2 phút (nhồi kiến thức ngắn hạn)
-                    if (t < 0.02 && reps > 0) return; 
-                    
-                    const y = g === 1 ? 0 : 1; 
-                    if (reps > 0) {
-                        const r = Math.pow(1 + t / (9 * s), -1);
-                        const p = Math.min(Math.max(r, 0.001), 0.999);
-                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
+                    self.onmessage = function(e) {
+                        const { w, cardLogs, epochs } = e.data;
+                        let curW = [...w];
+                        let m = new Array(21).fill(0); 
+                        const eps = 1e-4, alpha = 0.01, beta = 0.9;
                         
-                        // Logic D và S khớp 100% với hàm calculate (V5 chuẩn)
-                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
-                        d = testW[4] * (1 - testW[7]) + d * testW[7];
+                        function getLoss(testW) {
+                            let logLoss = 0, count = 0;
+                            cardLogs.forEach(card => {
+                                let s = 0, d = 0, reps = 0;
+                                card.logs.forEach(log => {
+                                    const { g, t } = log;
+                                    if (t < 0.02 && reps > 0) return; 
+                                    
+                                    const y = g === 1 ? 0 : 1; 
+                                    if (reps > 0) {
+                                        const r = Math.pow(1 + t / (9 * s), -1);
+                                        const p = Math.min(Math.max(r, 0.0001), 0.9999);
+                                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
+                                        
+                                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
+                                        d = testW[4] * (1 - testW[7]) + d * testW[7];
 
-                        if (g === 1) {
-                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
-                        } else {
-                            const h = (g === 2) ? testW[15] : 1;
-                            const e = (g === 4) ? testW[16] : 1;
-                            // ĐÃ FIX: Dùng s thay vì testW[9] ở cơ số
-                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * h * e);
+                                        if (g === 1) {
+                                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
+                                        } else {
+                                            const h = (g === 2) ? testW[15] : 1;
+                                            const e = (g === 4) ? testW[16] : 1;
+                                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * h * e);
+                                        }
+                                    } else {
+                                        s = testW[g - 1]; 
+                                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
+                                    }
+                                    reps++; 
+                                    s = Math.max(0.1, s);
+                                    count++;
+                                });
+                            });
+                            return logLoss / (count || 1);
                         }
-                    } else {
-                        s = testW[g - 1]; 
-                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
-                    }
-                    reps++; 
-                    s = Math.max(0.1, s);
-                    count++;
-                });
-            });
-            return logLoss / (count || 1);
-        }
 
-        for (let e = 0; e < epochs; e++) {
-            let grads = new Array(21).fill(0);
-            const baseLoss = getLoss(curW);
-            for (let j = 0; j < 21; j++) {
-                let tempW = [...curW]; 
-                tempW[j] += eps;
-                grads[j] = (getLoss(tempW) - baseLoss) / eps;
-            }
-            for (let j = 0; j < 21; j++) {
-                // Thuật toán tối ưu hóa Momentum
-                m[j] = beta * m[j] + (1 - beta) * grads[j];
-                curW[j] -= alpha * m[j];
-                // Chốt chặn giá trị tham số không bị âm
-                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
-            }
-        }
-        self.postMessage({ w: curW });
-    };
-`;
+                        for (let e = 0; e < epochs; e++) {
+                            let grads = new Array(21).fill(0);
+                            const baseLoss = getLoss(curW);
+                            for (let j = 0; j < 21; j++) {
+                                let tempW = [...curW]; 
+                                tempW[j] += eps;
+                                grads[j] = (getLoss(tempW) - baseLoss) / eps;
+                            }
+                            for (let j = 0; j < 21; j++) {
+                                m[j] = beta * m[j] + (1 - beta) * grads[j];
+                                curW[j] -= alpha * m[j];
+                                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
+                            }
+                        }
+                        self.postMessage({ w: curW });
+                    };
+                `;
 
                 const blob = new Blob([workerCode], {type: 'application/javascript'});
                 const blobURL = URL.createObjectURL(blob);
                 const worker = new Worker(blobURL);
                 
-                // Thu hồi URL ngay để tránh rò rỉ bộ nhớ
-                URL.revokeObjectURL(blobURL);
-
                 worker.onmessage = async (e) => {
                     DB.meta.W = e.data.w; 
                     await DB.saveMeta();
                     this.state.isOptimizing = false;
                     if (status) status.classList.remove('syncing');
+                    URL.revokeObjectURL(blobURL);
                     worker.terminate();
                 };
                 
-                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 20 });
+                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 10 });
             },
 
             renderNexus(p) { p.innerHTML = `<div class="h-full flex flex-col gap-6"><div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner"><textarea id="in-batch" placeholder="word:meaning" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl resize-none placeholder:text-zinc-800"></textarea></div><button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm">Import</button></div>`; },
             
             async batch() { 
-                const raw = document.getElementById('in-batch').value; 
+                const inputEl = document.getElementById('in-batch');
+                const raw = inputEl.value; 
                 if(!raw.trim()) return; 
+                
+                // Đổi trạng thái nút để tránh bấm nhầm khi đang xử lý
+                const btn = event.target;
+                const originalText = btn.innerText;
+                btn.innerText = "IMPORTING...";
+                btn.disabled = true;
+
                 const vocab = await DB.getVocab();
                 const existing = new Set(vocab.map(i => i.en.toLowerCase()));
-                for(let l of raw.split('\n')) { 
+                
+                // Quét rác: Chỉ lấy những dòng có định dạng "từ:nghĩa", bỏ dòng trống
+                const lines = raw.split('\n').map(l => l.trim()).filter(l => l.includes(':'));
+
+                for(let l of lines) { 
                     const parts = l.split(':');
-                    if(parts.length > 1 && !existing.has(parts[0].trim().toLowerCase())) {
-                        await DB.saveItem({ id: crypto.randomUUID(), en: parts[0].trim(), vi: parts.slice(1).join(':').trim(), next: Date.now(), reps: 0, s: 0, d: 0, lastReview: 0, logs: [] }); 
+                    const en = parts[0].trim();
+                    const vi = parts.slice(1).join(':').trim(); // Lấy hết phần nghĩa kể cả khi có dấu :
+                    
+                    if(en && vi && !existing.has(en.toLowerCase())) {
+                        await DB.saveItem({ 
+                            id: generateID(), 
+                            en, vi, 
+                            next: Date.now(), 
+                            reps: 0, s: 0, d: 0, 
+                            lastReview: 0, logs: [] 
+                        }); 
+                        existing.add(en.toLowerCase()); 
                     }
                 } 
+                
                 await DB.flush(); 
+                inputEl.value = ''; // Dọn sạch ô nhập
+                btn.innerText = originalText;
+                btn.disabled = false;
                 this.route('study'); 
+                DB.updateUI();
             },
 
             async renderVault(v) { 
