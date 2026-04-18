@@ -402,7 +402,13 @@ async function askAI(prompt) {
         }
         await DB.flush(); 
         inputEl.value = '';
-        this.route('study'); 
+        await DB.flush(); 
+        inputEl.value = '';
+        
+        // CHI TIẾT QUAN TRỌNG: Ép app khởi động lại logic học ngay lập tức
+        await Core.route('study'); 
+        
+        DB.updateUI(); 
         DB.updateUI();
     } catch(e) {
         alert("Lỗi: Dữ liệu AI không đúng định dạng!");
