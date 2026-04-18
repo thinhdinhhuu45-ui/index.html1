@@ -459,15 +459,28 @@ const DB = {
                 const now = Date.now();
                 let totalR = 0, learned = 0, dailyDue = Array(parseInt(days) || 7).fill(0);
                 vocab.forEach(item => {
-                    if (!item.s || item.reps === 0) return;
-                    learned++;
-                    const tEnd = (now + (days * 86400000) - (item.lastReview || now)) / 86400000;
-                    totalR += Math.pow(1 + tEnd / (9 * item.s), -1);
-                    const tDue = 9 * item.s * (1 / targetR - 1);
-                    const diff = Math.floor(((item.lastReview || now) + (tDue * 86400000) - now) / 86400000);
-                    if (diff >= 0 && diff < days) dailyDue[diff]++;
-                    else if (diff < 0) dailyDue[0]++;
-                });
+    if (!item.s || item.reps === 0) return;
+    learned++;
+    
+    // Tính toán khả năng nhớ được sau 'days' ngày (để hiện con số % to tướng)
+    const tEnd = (now + (days * 86400000) - (item.lastReview || now)) / 86400000;
+    totalR += Math.pow(1 + tEnd / (9 * item.s), -1);
+
+    // Tính ngày đến hạn (Due Date)
+    const tDue = 9 * item.s * (1 / DB.meta.desired_retention - 1);
+    const dueDate = (item.lastReview || now) + (tDue * 86400000);
+    
+    // Tính khoảng cách từ hôm nay đến ngày đó
+    // Dùng Math.ceil để tránh việc thẻ đến hạn vào chiều nay bị tính là ngày -1
+    const diff = Math.floor((dueDate - now) / 86400000);
+
+    // CHỐT CHẶN LỖI SỐ ÂM:
+    if (diff < 0) {
+        dailyDue[0]++; // Nếu quá hạn (số âm), gom hết vào cột "Hôm nay" (cột đầu tiên)
+    } else if (diff < days) {
+        dailyDue[diff]++; // Nếu trong tương lai, xếp vào đúng cột của ngày đó
+    }
+});
                 return { avgR: learned ? (totalR / learned * 100).toFixed(1) : 100, dailyDue };
             },
 
