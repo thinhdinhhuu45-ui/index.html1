@@ -96,7 +96,7 @@ const DEFAULT_W = [
 
             async saveItem(item) { 
                 this.writeBuffer.set(item.id, item); 
-                if (this.writeBuffer.size >= 10) await this.flush(); 
+                if (this.writeBuffer.size >= 1) await this.flush(); 
             },
 
             async saveMeta() { 
@@ -185,7 +185,7 @@ const DEFAULT_W = [
                 await DB.saveItem(item);
                 if(g === 1) this.state.queue.splice(Math.min(10, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
                 
-                if (DB.meta.sessionReviews >= 30) {
+                if (DB.meta.sessionReviews >= 10) {
                     DB.meta.sessionReviews = 0;
                     this.optimizeW(); 
                 }
@@ -196,24 +196,18 @@ const DEFAULT_W = [
                 let { s, d, reps } = item; 
                 const w = DB.meta.W;
                 const ret = DB.meta.desired_retention;
-                
-                // Tính khả năng nhớ lại (Retrievability)
                 const r = reps > 0 ? Math.pow(1 + t / (9 * s), -1) : 1;
 
                 if (reps === 0) {
-                    // Khởi tạo thẻ mới (W0-W3 cho Stability, W4-W5 cho Difficulty)
                     s = w[g - 1]; 
                     d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
                 } else {
-                    // Cập nhật Difficulty (D) với cơ chế Drift (W6, W7)
                     d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
                     d = w[4] * (1 - w[7]) + d * w[7]; 
                     
                     if (g === 1) {
-                        // Khi quên bài (Again) - Dùng W11 đến W14
                         s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
                     } else {
-                        // Khi nhớ bài (Hard, Good, Easy) - Dùng W8 đến W10 + W15, W16
                         const h = (g === 2) ? w[15] : 1;
                         const e = (g === 4) ? w[16] : 1;
                         s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * h * e);
@@ -222,8 +216,6 @@ const DEFAULT_W = [
 
                 s = Math.max(0.1, isFinite(s) ? s : 0.1); 
                 d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                
-                // Khoảng cách ngày (Interval) chuẩn FSRS v5
                 const ivl = s * 9 * (1 / ret - 1);
 
                 Object.assign(item, { 
@@ -244,9 +236,8 @@ const DEFAULT_W = [
             async optimizeW() {
                 if (this.state.isOptimizing) return;
                 const vocab = await DB.getVocab();
-                // Chỉ tối ưu khi có ít nhất 10 thẻ có lịch sử học (mỗi thẻ ít nhất 5 logs)
-                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 5).map(v => ({ logs: v.logs }));
-                if(cardsWithLogs.length < 10) return;
+                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 3).map(v => ({ logs: v.logs }));
+                if(cardsWithLogs.length < 5) return;
                 
                 this.state.isOptimizing = true;
                 const status = document.getElementById('sync-status'); 
@@ -449,7 +440,23 @@ const DEFAULT_W = [
             }
         };
 
-        DB.init().then(() => Core.route('study'));
+        // Thay thế đoạn DB.init cũ bằng đoạn này để ép cập nhật 21 tham số
+DB.init().then(async () => {
+    // 1. Kiểm tra nếu bộ tham số W bị thiếu (không đủ 21 số của V5)
+    if (!DB.meta.W || DB.meta.W.length !== 21) {
+        console.log("Phát hiện bộ nhớ cũ (thiếu tham số), đang nâng cấp lên 21 chỉ số...");
+        DB.meta.W = [...DEFAULT_W]; // Lấy bộ 21 số mặc định bạn khai báo ở trên
+        await DB.saveMeta(); // Lưu đè vào máy ngay lập tức
+    }
+
+    // 2. Kiểm tra nếu các biến thống kê bị thiếu thì bổ sung luôn để tránh lỗi tính toán
+    if (DB.meta.sessionReviews === undefined) DB.meta.sessionReviews = 0;
+    if (DB.meta.totalRev === undefined) DB.meta.totalRev = 0;
+    if (DB.meta.successRev === undefined) DB.meta.successRev = 0;
+
+    // 3. Sau khi dọn dẹp bộ nhớ xong mới cho phép vào học
+    Core.route('study');
+});
     </script>
 </body>
 </html>
