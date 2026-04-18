@@ -193,65 +193,74 @@ const DB = {
             flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
 
             async ans(g) {
-                if(this.state.fsm !== 'BACK') return;
-                this.state.fsm = 'TRANSITION';
-                const qItem = this.state.queue.shift(); const item = qItem.ref || qItem;
-                const t = item.lastReview ? Math.max(0, Math.floor((Date.now() - item.lastReview) / 86400000)) : 0;
-                
-                if(!item.logs) item.logs = [];
-                item.logs.push({ g, t });
-                if (item.logs.length > 20) item.logs = item.logs.slice(-20);
+    if(this.state.fsm !== 'BACK') return;
+    this.state.fsm = 'TRANSITION';
+    const qItem = this.state.queue.shift(); const item = qItem.ref || qItem;
+    const t = item.lastReview ? (Date.now() - item.lastReview) / 86400000 : 0;
+    
+    // CHỈ LƯU LOG KHI: Thẻ không phải là 'Debt' (học lại trong phiên) 
+    // và khoảng cách t > 0.1 ngày (tránh spam phím)
+    if(!qItem.isDebt) {
+        if(!item.logs) item.logs = [];
+        item.logs.push({ g, t: parseFloat(t.toFixed(4)) });
+        if (item.logs.length > 500) item.logs.shift(); // Giữ 500 log gần nhất để học
+        
+        DB.meta.totalRev++;
+        if(g >= 2) DB.meta.successRev++;
+        this.updateStreak();
+    }
 
-                this.calculate(item, g, t);
-                if(!qItem.isDebt) {
-                    DB.meta.totalRev++;
-                    if(g >= 2) DB.meta.successRev++;
-                    DB.meta.sessionReviews++;
-                    this.updateStreak();
-                }
-                await DB.saveItem(item);
-                if(g === 1) this.state.queue.splice(Math.min(10, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
-                
-                if (DB.meta.sessionReviews >= 10) {
-                    DB.meta.sessionReviews = 0;
-                    this.optimizeW(); 
-                }
-                await DB.saveMeta(); this.nextCard();
-            },
+    this.calculate(item, g, t);
+    await DB.saveItem(item);
+    
+    if(g === 1) {
+        this.state.queue.splice(Math.min(10, this.state.queue.length), 0, { ...item, isDebt: true, ref: item });
+    }
+    
+    // Nếu hết bài, tự động chạy Optimizer để tiến hóa
+    if(this.state.queue.length === 0) this.optimizeW();
+    
+    await DB.saveMeta(); this.nextCard();
+},
 
             calculate(item, g, t) {
-                let { s, d, reps } = item; 
-                const w = DB.meta.W;
-                const ret = DB.meta.desired_retention;
-                const r = reps > 0 ? Math.pow(1 + t / (9 * s), -1) : 1;
+    const w = DB.meta.W;
+    const ret = DB.meta.desired_retention;
+    let { s, d, reps } = item;
+    
+    // Tính khả năng nhớ hiện tại (R) - Quy luật lũy thừa (Power Law)
+    const r = reps > 0 ? Math.pow(1 + t / (9 * s), -1) : 1;
 
-                if (reps === 0) {
-                    s = w[g - 1]; 
-                    d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
-                } else {
-                    d = Math.min(Math.max(d - w[6] * (g - 3), 1), 10);
-                    d = w[4] * (1 - w[7]) + d * w[7]; 
-                    
-                    if (g === 1) {
-                        s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
-                    } else {
-                        const h = (g === 2) ? w[15] : 1;
-                        const e = (g === 4) ? w[16] : 1;
-                        s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * h * e);
-                    }
-                }
+    if (reps === 0) {
+        // Khởi tạo S theo 4 mức độ phản hồi (W0-W3)
+        s = w[g - 1];
+        d = Math.min(Math.max(w[4] - (g - 3) * w[5], 1), 10);
+    } else {
+        // Cập nhật Difficulty (D) - Mean Reversion (hướng về W4)
+        d = d - w[6] * (g - 3);
+        d = w[4] * (1 - w[7]) + d * w[7]; // Giữ D không bị lệch quá xa mức trung bình
+        d = Math.min(Math.max(d, 1), 10);
 
-                s = Math.max(0.1, isFinite(s) ? s : 0.1); 
-                d = Math.min(Math.max(isFinite(d) ? d : 5, 1), 10);
-                const ivl = s * 9 * (1 / ret - 1);
+        if (g === 1) { 
+            // Khi quên (Again): S suy giảm theo công thức Failure
+            s = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
+        } else {
+            // Khi nhớ: S tăng trưởng theo công thức Success
+            const h = (g === 2) ? w[15] : 1;
+            const e = (g === 4) ? w[16] : 1;
+            s = s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * h * e);
+        }
+    }
 
-                Object.assign(item, { 
-                    s, d, 
-                    reps: reps + 1, 
-                    lastReview: Date.now(), 
-                    next: Date.now() + (Math.max(0.01, ivl) * 86400000) 
-                });
-            },
+    s = Math.max(0.1, isFinite(s) ? s : 0.1);
+    const ivl = s * 9 * (1 / ret - 1); // Khoảng cách ngày học tiếp theo
+
+    Object.assign(item, {
+        s, d, reps: reps + 1,
+        lastReview: Date.now(),
+        next: Date.now() + (Math.max(0.01, ivl) * 86400000)
+    });
+}
 
             updateStreak() {
                 const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -261,92 +270,71 @@ const DB = {
             },
 
             async optimizeW() {
-                if (this.state.isOptimizing) return;
-                const vocab = await DB.getVocab();
-                // Chỉ tối ưu khi có ít nhất 5 từ đã học trên 3 lần để đủ dữ liệu
-                const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 3).map(v => ({ logs: v.logs }));
-                if(cardsWithLogs.length < 5) return;
-                
-                this.state.isOptimizing = true;
-                const status = document.getElementById('sync-status'); 
-                if (status) status.classList.add('syncing');
+    if (this.state.isOptimizing) return;
+    const vocab = await DB.getVocab();
+    // Cần tối thiểu 10-20 thẻ có lịch sử học để bắt đầu "khôn"
+    const cardsWithLogs = vocab.filter(v => v.logs && v.logs.length >= 3);
+    if(cardsWithLogs.length < 10) return;
 
-                const workerCode = `
-                    self.onmessage = function(e) {
-                        const { w, cardLogs, epochs } = e.data;
-                        let curW = [...w];
-                        let m = new Array(21).fill(0); 
-                        const eps = 1e-4, alpha = 0.01, beta = 0.9;
-                        
-                        function getLoss(testW) {
-                            let logLoss = 0, count = 0;
-                            cardLogs.forEach(card => {
-                                let s = 0, d = 0, reps = 0;
-                                card.logs.forEach(log => {
-                                    const { g, t } = log;
-                                    if (t < 0.02 && reps > 0) return; 
-                                    
-                                    const y = g === 1 ? 0 : 1; 
-                                    if (reps > 0) {
-                                        const r = Math.pow(1 + t / (9 * s), -1);
-                                        const p = Math.min(Math.max(r, 0.0001), 0.9999);
-                                        logLoss += -(y * Math.log(p) + (1 - y) * Math.log(1 - p));
-                                        
-                                        d = Math.min(Math.max(d - testW[6] * (g - 3), 1), 10);
-                                        d = testW[4] * (1 - testW[7]) + d * testW[7];
+    this.state.isOptimizing = true;
+    const status = document.getElementById('sync-status');
+    if (status) { status.innerText = "AI EVOLVING..."; status.classList.add('syncing'); }
 
-                                        if (g === 1) {
-                                            s = testW[11] * Math.pow(d, -testW[12]) * (Math.pow(s + 1, testW[13]) - 1) * Math.exp(testW[14] * (1 - r));
-                                        } else {
-                                            const h = (g === 2) ? testW[15] : 1;
-                                            const e = (g === 4) ? testW[16] : 1;
-                                            s = s * (1 + Math.exp(testW[8]) * (11 - d) * Math.pow(s, -testW[9]) * (Math.exp(testW[10] * (1 - r)) - 1) * h * e);
-                                        }
-                                    } else {
-                                        s = testW[g - 1]; 
-                                        d = Math.min(Math.max(testW[4] - (g - 3) * testW[5], 1), 10);
-                                    }
-                                    reps++; 
-                                    s = Math.max(0.1, s);
-                                    count++;
-                                });
-                            });
-                            return logLoss / (count || 1);
-                        }
+    const workerCode = `
+        self.onmessage = function(e) {
+            const { w, cardLogs, epochs } = e.data;
+            let curW = [...w];
+            let m = new Array(21).fill(0), v = new Array(21).fill(0);
+            const alpha = 0.01, beta1 = 0.9, beta2 = 0.999, eps = 1e-8;
 
-                        for (let e = 0; e < epochs; e++) {
-                            let grads = new Array(21).fill(0);
-                            const baseLoss = getLoss(curW);
-                            for (let j = 0; j < 21; j++) {
-                                let tempW = [...curW]; 
-                                tempW[j] += eps;
-                                grads[j] = (getLoss(tempW) - baseLoss) / eps;
-                            }
-                            for (let j = 0; j < 21; j++) {
-                                m[j] = beta * m[j] + (1 - beta) * grads[j];
-                                curW[j] -= alpha * m[j];
-                                curW[j] = Math.max(0.001, parseFloat(curW[j].toFixed(4)));
-                            }
-                        }
-                        self.postMessage({ w: curW });
-                    };
-                `;
+            function getLoss(testW) {
+                let logLoss = 0, count = 0;
+                cardLogs.forEach(card => {
+                    let s = 0, d = 0, reps = 0;
+                    card.logs.forEach(log => {
+                        const { g, t } = log;
+                        if (reps > 0) {
+                            const r = Math.pow(1 + t / (9 * s), -1);
+                            const p = Math.min(Math.max(r, 0.001), 0.999);
+                            logLoss += -( (g === 1 ? 0 : 1) * Math.log(p) + (g === 1 ? 1 : 0) * Math.log(1 - p) );
+                            d = Math.min(Math.max(d - testW[6]*(g-3), 1), 10);
+                            d = testW[4]*(1-testW[7]) + d*testW[7];
+                            if(g===1) s = testW[11]*Math.pow(d,-testW[12])*(Math.pow(s+1,testW[13])-1)*Math.exp(testW[14]*(1-r));
+                            else s = s*(1+Math.exp(testW[8])*(11-d)*Math.pow(s,-testW[9])*(Math.exp(testW[10]*(1-r))-1)*(g==2?testW[15]:1)*(g==4?testW[16]:1));
+                        } else { s = testW[g-1]; d = testW[4] - (g-3)*testW[5]; }
+                        reps++; count++;
+                    });
+                });
+                return logLoss / count;
+            }
 
-                const blob = new Blob([workerCode], {type: 'application/javascript'});
-                const blobURL = URL.createObjectURL(blob);
-                const worker = new Worker(blobURL);
-                
-                worker.onmessage = async (e) => {
-                    DB.meta.W = e.data.w; 
-                    await DB.saveMeta();
-                    this.state.isOptimizing = false;
-                    if (status) status.classList.remove('syncing');
-                    URL.revokeObjectURL(blobURL);
-                    worker.terminate();
-                };
-                
-                worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 10 });
-            },
+            for (let e = 1; e <= epochs; e++) {
+                const baseLoss = getLoss(curW);
+                for (let j = 0; j < 21; j++) {
+                    let tw = [...curW]; tw[j] += 1e-5;
+                    let grad = (getLoss(tw) - baseLoss) / 1e-5;
+                    m[j] = beta1 * m[j] + (1 - beta1) * grad;
+                    v[j] = beta2 * v[j] + (1 - beta2) * grad * grad;
+                    let m_hat = m[j] / (1 - Math.pow(beta1, e));
+                    let v_hat = v[j] / (1 - Math.pow(beta2, e));
+                    curW[j] -= alpha * m_hat / (Math.sqrt(v_hat) + eps);
+                }
+            }
+            self.postMessage({ w: curW });
+        };
+    `;
+
+    const blob = new Blob([workerCode], {type: 'application/javascript'});
+    const worker = new Worker(URL.createObjectURL(blob));
+    worker.onmessage = async (e) => {
+        DB.meta.W = e.data.w;
+        await DB.saveMeta();
+        this.state.isOptimizing = false;
+        if (status) { status.innerText = "AI READY"; status.classList.remove('syncing'); }
+        worker.terminate();
+    };
+    worker.postMessage({ w: DB.meta.W, cardLogs: cardsWithLogs, epochs: 40 });
+},
 
             renderNexus(p) { p.innerHTML = `<div class="h-full flex flex-col gap-6"><div class="flex-grow flex flex-col bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 shadow-inner"><textarea id="in-batch" placeholder="word:meaning" class="flex-grow w-full bg-transparent text-teal-400 outline-none font-bold text-2xl resize-none placeholder:text-zinc-800"></textarea></div><button onclick="Core.batch()" class="bg-teal-500 text-black py-8 rounded-[2rem] font-black uppercase text-sm">Import</button></div>`; },
             
