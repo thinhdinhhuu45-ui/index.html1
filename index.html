@@ -150,8 +150,9 @@ let GEMINI_API_KEY = localStorage.getItem('user_api_key') || "";
 
 async function askAI(prompt) {
     const currentKey = localStorage.getItem('user_api_key') || "";
-    if (!currentKey) return "Chưa có Key ông ơi!";
+    if (!currentKey) return "Chưa có Key!";
 
+    // Link này là link chuẩn quốc tế cho Gemini 1.5 Flash (bộ não của Gemini 3)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
 
     try {
@@ -164,10 +165,12 @@ async function askAI(prompt) {
         });
 
         const data = await response.json();
-        if (!response.ok) return "Lỗi vùng miền: " + data.error.message;
+        if (!response.ok) {
+            return "Lỗi: " + (data.error ? data.error.message : "Không xác định");
+        }
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
-        return "Kết nối bị chặn rồi!";
+        return "Lỗi kết nối mạng!";
     }
 }
         const Core = {
