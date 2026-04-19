@@ -145,7 +145,7 @@ const DB = {
 // ==========================================
 // BƯỚC 1: KẾT NỐI BỘ NÃO GEMINI AI
 // ==========================================
-const GEMINI_API_KEY = "AIzaSyB0OallSzi7gzI6p4viM-U5MPiUwgN_Z0Y";
+const GEMINI_API_KEY = "AIzaSyC5o1ClbJ70iLZ8Co6y4nOayCSzO7LVVro";
 
 async function askAI(prompt) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
@@ -206,16 +206,20 @@ async function askAI(prompt) {
 },
 
             renderStudyFrame(v) {
-                v.innerHTML = `<div id="study-container" class="h-full flex flex-col justify-between">
-                    <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
-                        <div id="cf" class="card-side p-8 text-center flex-grow"><h2 id="en-disp" class="text-4xl font-black uppercase tracking-tighter text-white break-all"></h2></div>
-                        <div id="cb" class="card-side p-8 text-center flex-grow hidden"><h2 id="vi-disp" class="text-3xl font-black text-teal-400 break-words"></h2></div>
-                    </div>
-                    <div id="ctrl" class="grid grid-cols-4 gap-3 mt-6 opacity-0 pointer-events-none transition-all">
-                        ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-8 rounded-[2rem] text-[10px] font-black uppercase text-zinc-400">${['Again','Hard','Good','Easy'][g-1]}</button>`).join('')}
-                    </div>
-                </div><div id="empty-msg" class="hidden card-side border-2 border-dashed border-zinc-800 text-sm font-black text-zinc-600 uppercase tracking-[0.2em]">All Clear</div>`;
-            },
+    v.innerHTML = `<div id="study-container" class="h-full flex flex-col justify-between">
+        <div class="cursor-pointer flex-grow flex flex-col" onclick="Core.flip()">
+            <div id="cf" class="card-side p-8 text-center flex-grow"><h2 id="en-disp" class="text-4xl font-black uppercase tracking-tighter text-white break-all"></h2></div>
+            <div id="cb" class="card-side p-8 text-center flex-grow hidden relative">
+                <h2 id="vi-disp" class="text-3xl font-black text-teal-400 break-words"></h2>
+                <button onclick="event.stopPropagation(); Core.getAIHelp()" class="mt-4 px-4 py-2 bg-teal-900/30 border border-teal-500/50 rounded-full text-[10px] font-black text-teal-500 uppercase tracking-widest active:scale-95 transition-all">✨ AI Help</button>
+                <div id="ai-reasoning" class="mt-4 text-[12px] text-zinc-400 italic font-medium max-w-[80%] leading-relaxed hidden"></div>
+            </div>
+        </div>
+        <div id="ctrl" class="grid grid-cols-4 gap-3 mt-6 opacity-0 pointer-events-none transition-all">
+            ${[1,2,3,4].map(g => `<button onclick="Core.ans(${g})" class="bg-zinc-900 border border-zinc-800 py-8 rounded-[2rem] text-[10px] font-black uppercase text-zinc-400">${['Again','Hard','Good','Easy'][g-1]}</button>`).join('')}
+        </div>
+    </div><div id="empty-msg" class="hidden card-side border-2 border-dashed border-zinc-800 text-sm font-black text-zinc-600 uppercase tracking-[0.2em]">All Clear</div>`;
+},
 
             async nextCard() {
                 if(!this.state.queue.length) {
@@ -230,9 +234,30 @@ async function askAI(prompt) {
                 document.getElementById('cf').classList.remove('hidden'); document.getElementById('cb').classList.add('hidden');
                 document.getElementById('ctrl').classList.add('opacity-0', 'pointer-events-none');
                 document.getElementById('progress').style.width = `${((this.state.initialQueueSize - this.state.queue.length) / this.state.initialQueueSize) * 100}%`;
-            },
+            const helpBox = document.getElementById('ai-reasoning');
+        if(helpBox) {
+            helpBox.classList.add('hidden');
+            helpBox.innerText = ""; // Xóa luôn nội dung cũ cho sạch
+        }},
 
-            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },
+            flip() { if(this.state.fsm === 'FRONT') { this.state.fsm = 'BACK'; document.getElementById('cf').classList.add('hidden'); document.getElementById('cb').classList.remove('hidden'); document.getElementById('ctrl').classList.remove('opacity-0', 'pointer-events-none'); } },async getAIHelp() {
+    const item = this.state.queue[0].ref || this.state.queue[0];
+    const helpBox = document.getElementById('ai-reasoning');
+    if (!helpBox) return;
+
+    helpBox.innerText = "AI đang suy nghĩ...";
+    helpBox.classList.remove('hidden');
+
+    const prompt = `Giải thích ngắn gọn từ "${item.en}" (nghĩa là ${item.vi}) bằng 1 câu ví dụ hài hước hoặc một mẹo ghi nhớ (mnemonics). Chỉ trả về tối đa 30 từ tiếng Việt.`;
+    
+    const result = await askAI(prompt);
+    if (result) {
+        // Lọc bớt các ký tự thừa nếu có
+        helpBox.innerText = result.replace(/["*]/g, '');
+    } else {
+        helpBox.innerText = "Lỗi kết nối AI rồi bạn ơi!";
+    }
+},
 
             async ans(g) {
     if(this.state.fsm !== 'BACK') return;
