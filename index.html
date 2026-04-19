@@ -149,31 +149,33 @@ const DB = {
 let GEMINI_API_KEY = localStorage.getItem('user_api_key') || "";
 
 async function askAI(prompt) {
-    // Luôn lấy key mới nhất từ máy khi chạy
     const currentKey = localStorage.getItem('user_api_key') || "";
-    
-    if (!currentKey) {
-        return "Bạn chưa nạp API Key trong tab Data!";
-    }
+    if (!currentKey) return "Bạn chưa nạp API Key!";
 
+    // SỬA CHỖ NÀY: Dùng link v1beta chuẩn của Gemini 1.5 Flash
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            })
         });
-        
+
         if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Lỗi API:", errorData);
-            return "Lỗi: Key không hợp lệ hoặc hết hạn.";
+            // Nếu vẫn lỗi 404 hoặc 400, in ra để kiểm tra
+            const err = await response.json();
+            console.error("Chi tiết lỗi:", err);
+            return "Lỗi API: Kiểm tra lại cấu trúc URL hoặc Model name.";
         }
 
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
-        console.error("Lỗi kết nối:", e);
         return "Lỗi kết nối mạng!";
     }
 }
