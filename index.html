@@ -152,7 +152,7 @@ async function askAI(prompt) {
     const currentKey = localStorage.getItem('user_api_key') || "";
     if (!currentKey) return "Bạn chưa nạp API Key!";
 
-    // SỬA CHỖ NÀY: Dùng link v1beta chuẩn của Gemini 1.5 Flash
+    // Đổi gemini-pro thành gemini-1.5-flash cho ổn định
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
 
     try {
@@ -166,20 +166,18 @@ async function askAI(prompt) {
             })
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            // Nếu vẫn lỗi 404 hoặc 400, in ra để kiểm tra
-            const err = await response.json();
-            console.error("Chi tiết lỗi:", err);
-            return "Lỗi API: Kiểm tra lại cấu trúc URL hoặc Model name.";
+            // Hiển thị lỗi chi tiết để ông biết đường sửa
+            return `Lỗi từ Google: ${data.error.message}`;
         }
 
-        const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
-        return "Lỗi kết nối mạng!";
+        return "Lỗi kết nối mạng rồi bạn ơi!";
     }
 }
-// ==========================================
         const Core = {
             state: { view: '', queue: [], initialQueueSize: 0, fsm: 'IDLE', isOptimizing: false, vaultData: [] },
             
