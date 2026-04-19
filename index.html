@@ -153,7 +153,7 @@ async function askAI(prompt) {
     if (!currentKey) return "Chưa có Key!";
 
     // Link này là link chuẩn quốc tế cho Gemini 1.5 Flash (bộ não của Gemini 3)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${currentKey}`;
 
     try {
         const response = await fetch(url, {
