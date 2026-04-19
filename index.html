@@ -500,43 +500,41 @@ else {
             async del(id) { await DB.deleteItem(id); await DB.flush(); this.route('vault'); DB.updateUI(); },
 
             async renderData(v) {
-                v.innerHTML = `
-                    <div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <span class="text-[10px] font-black uppercase text-zinc-500">Desired Retention</span>
-                            <span id="ret-val" class="text-xl font-black text-teal-500">${(DB.meta.desired_retention * 100).toFixed(0)}%</span>
-                        </div>
-                        <input type="range" min="0.7" max="0.97" step="0.01" value="${DB.meta.desired_retention}" 
-                            oninput="Core.updateRetention(this.value)" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
-                    </div>
-                    <div class="bg-zinc-900/30 border border-zinc-800/50 rounded-[2rem] p-6 mb-6">
-    <div class="text-[10px] font-black uppercase text-zinc-500 mb-4 text-center tracking-widest">AI Brain Weights (W0-W20)</div>
-    <div class="grid grid-cols-4 gap-2">
-        ${DB.meta.W.map((val, i) => `
-            <div class="bg-black/40 p-2 rounded-xl border border-zinc-800/30 text-center">
-                <div class="text-[7px] text-zinc-600 font-bold">W${i}</div>
-                <div class="text-[10px] font-mono font-black text-teal-600">${val.toFixed(3)}</div>
+    v.innerHTML = `
+        <div class="bg-zinc-900/50 border border-teal-500/30 rounded-[3rem] p-8 mb-6">
+            <div class="text-[10px] font-black uppercase text-teal-500 mb-4 tracking-widest">Gemini API Configuration</div>
+            <input type="password" id="key-input" placeholder="Dán API Key vào đây..." 
+                value="${GEMINI_API_KEY}"
+                class="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-teal-400 font-mono text-sm outline-none mb-4">
+            <button onclick="Core.saveKey()" class="w-full py-3 bg-teal-500 text-black rounded-xl font-black text-[10px] uppercase">Lưu Key AI</button>
+        </div>
+
+        <div class="bg-zinc-900/50 border border-zinc-800 rounded-[3rem] p-8 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-[10px] font-black uppercase text-zinc-500">Desired Retention</span>
+                <span id="ret-val" class="text-xl font-black text-teal-500">${(DB.meta.desired_retention * 100).toFixed(0)}%</span>
             </div>
-        `).join('')}
-    </div>
-</div>
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
-                            <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Actual Retention</div>
-                            <div class="text-2xl font-black text-teal-500">${DB.meta.totalRev ? (DB.meta.successRev / DB.meta.totalRev * 100).toFixed(1) : 0}%</div>
-                        </div>
-                        <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
-                            <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Total Reviews</div>
-                            <div class="text-2xl font-black text-zinc-400">${DB.meta.totalRev}</div>
-                        </div>
-                    </div>
-                    <button onclick="Core.optimizeW()" class="w-full mb-4 py-5 bg-teal-900/20 border border-teal-800 rounded-[2rem] font-black text-xs uppercase text-teal-500 active:bg-teal-500 active:text-black transition-all tracking-widest">Force Train AI</button>
-                    <div class="grid grid-cols-2 gap-4">
-                        <button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button>
-                        <button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button>
-                    </div><input type="file" id="file" class="hidden" onchange="Core.imp(this)">
-                `;
-            },
+            <input type="range" min="0.7" max="0.97" step="0.01" value="${DB.meta.desired_retention}" 
+                oninput="Core.updateRetention(this.value)" class="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer">
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
+                <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Actual Retention</div>
+                <div class="text-2xl font-black text-teal-500">${DB.meta.totalRev ? (DB.meta.successRev / DB.meta.totalRev * 100).toFixed(1) : 0}%</div>
+            </div>
+            <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-[2rem] text-center">
+                <div class="text-[9px] font-black text-zinc-500 mb-1 uppercase">Total Reviews</div>
+                <div class="text-2xl font-black text-zinc-400">${DB.meta.totalRev}</div>
+            </div>
+        </div>
+        <button onclick="Core.optimizeW()" class="w-full mb-4 py-5 bg-teal-900/20 border border-teal-800 rounded-[2rem] font-black text-xs uppercase text-teal-500 active:bg-teal-500 active:text-black transition-all tracking-widest">Force Train AI</button>
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="Core.exp()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Export</button>
+            <button onclick="document.getElementById('file').click()" class="py-6 bg-zinc-900 border border-zinc-800 rounded-[2rem] font-black text-xs uppercase text-zinc-400">Import</button>
+        </div><input type="file" id="file" class="hidden" onchange="Core.imp(this)">
+    `;
+},
             saveKey() {
     const val = document.getElementById('key-input').value.trim();
     localStorage.setItem('user_api_key', val);
