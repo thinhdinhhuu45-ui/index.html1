@@ -163,14 +163,17 @@ async function askAI(prompt) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                // Dùng model Llama 3.3 Versatile - Con hàng mạnh nhất & miễn phí hiện nay
-                model: "llama-3.3-70b-versatile", 
-                messages: [
-                    { "role": "system", "content": "Bạn là chuyên gia ngôn ngữ. Hãy giải thích từ vựng tiếng Anh một cách hài hước, ngắn gọn và dễ hiểu nhất cho học sinh Việt Nam." },
-                    { "role": "user", "content": prompt }
-                ],
-                temperature: 0.7
-            })
+    // Đổi sang Qwen 2.5 72B - Con này nói tiếng Việt như người bản xứ
+    model: "qwen-2.5-72b", 
+    messages: [
+        { 
+            "role": "system", 
+            "content": "Bạn là giáo viên dạy tiếng Anh vui tính. Khi người dùng gửi một từ hoặc câu, hãy giải thích nghĩa, cách dùng và lấy 1 ví dụ hài hước. Trả lời bằng tiếng Việt tự nhiên, không dùng từ ngữ máy móc." 
+        },
+        { "role": "user", "content": prompt }
+    ],
+    temperature: 0.6 // Giảm xuống một chút để nó bớt nói nhảm
+})
         });
 
         const data = await response.json();
