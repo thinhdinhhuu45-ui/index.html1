@@ -150,9 +150,8 @@ let GEMINI_API_KEY = localStorage.getItem('user_api_key') || "";
 
 async function askAI(prompt) {
     const currentKey = localStorage.getItem('user_api_key') || "";
-    if (!currentKey) return "Bạn chưa nạp API Key!";
+    if (!currentKey) return "Chưa có Key ông ơi!";
 
-    // Đổi gemini-pro thành gemini-1.5-flash cho ổn định
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
 
     try {
@@ -160,22 +159,15 @@ async function askAI(prompt) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }]
+                contents: [{ parts: [{ text: prompt }] }]
             })
         });
 
         const data = await response.json();
-
-        if (!response.ok) {
-            // Hiển thị lỗi chi tiết để ông biết đường sửa
-            return `Lỗi từ Google: ${data.error.message}`;
-        }
-
+        if (!response.ok) return "Lỗi vùng miền: " + data.error.message;
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
-        return "Lỗi kết nối mạng rồi bạn ơi!";
+        return "Kết nối bị chặn rồi!";
     }
 }
         const Core = {
