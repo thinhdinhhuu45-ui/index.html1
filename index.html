@@ -145,9 +145,15 @@ const DB = {
 // ==========================================
 // BƯỚC 1: KẾT NỐI BỘ NÃO GEMINI AI
 // ==========================================
-const GEMINI_API_KEY = "AIzaSyAFMlyJ2gYCRpzM8JnpvnMTW3_ybZW1mmM";
+// Lấy key từ máy người dùng, nếu không có thì để trống
+let GEMINI_API_KEY = localStorage.getItem('user_api_key') || "";
 
 async function askAI(prompt) {
+    // Nếu chưa có Key thì không gọi link nữa, tránh lỗi 403
+    if (!GEMINI_API_KEY) {
+        return "Bạn chưa nạp API Key trong tab Data!";
+    }
+
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     try {
         const response = await fetch(url, {
@@ -155,11 +161,14 @@ async function askAI(prompt) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+        
+        if (!response.ok) return "Lỗi: Key không hợp lệ hoặc hết hạn.";
+
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     } catch (e) {
         console.error("Lỗi AI:", e);
-        return null;
+        return "Lỗi kết nối!";
     }
 }
 // ==========================================
@@ -528,6 +537,13 @@ else {
                     </div><input type="file" id="file" class="hidden" onchange="Core.imp(this)">
                 `;
             },
+            saveKey() {
+    const val = document.getElementById('key-input').value.trim();
+    localStorage.setItem('user_api_key', val);
+    GEMINI_API_KEY = val;
+    alert("Đã cập nhật bộ não AI thành công!");
+    this.route('data'); // Load lại giao diện
+},
             updateRetention(v) {
                 DB.meta.desired_retention = parseFloat(v);
                 document.getElementById('ret-val').innerText = (v * 100).toFixed(0) + '%';
